@@ -2,7 +2,7 @@
 
 An AI back office for a small company, or a company of one.
 
-<!-- screenshot: home -->
+![Home: to-dos and project health in one place](docs/images/home.png)
 
 ## Why
 
@@ -22,7 +22,7 @@ The app gallery lists apps with a description, maintainer, and a way to open the
 
 An app can live at an address such as `https://demo.example.com`, with access for selected people, all remote colleagues, or the public. **Open on phone** gives the owner a preview link and QR code. Publishing needs domain and proxy setup; see [Publish web apps](#publish-web-apps).
 
-<!-- screenshot: apps -->
+![Publishing a web app and choosing who can open it](docs/images/apps.png)
 
 ### Find and share Skills
 
@@ -30,7 +30,7 @@ The Skill gallery scans Skills already installed for local agents. It flags outd
 
 Extra local agents or additional scan paths use `skill_harnesses`; extra read-only snapshot directories use `skill_snapshots`. Installing or updating a Skill in an agent remains a separate action; the gallery provides instructions to copy to that agent.
 
-<!-- screenshot: skills -->
+![Skills installed across agents, with outdated and broken copies flagged](docs/images/skills.png)
 
 ### Keep personal work and approvals visible
 

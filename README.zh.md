@@ -2,7 +2,7 @@
 
 给小公司，也给一人公司的 AI 中台。
 
-<!-- screenshot: home -->
+![首页：今天的待办和各项目状况](docs/images/zh/home.png)
 
 ## 解决什么问题
 
@@ -22,7 +22,7 @@ Onestead 把这些公司事实放在你自己的 git 仓库里，让 agent 通�
 
 应用可以使用 `https://demo.example.com` 这样的地址，可见范围分为指定的人、所有远程同事或公开。主人点击**在手机上打开**，就能获得预览链接和二维码。发布前需要配置域名和代理，见[发布网页应用](#发布网页应用)。
 
-<!-- screenshot: apps -->
+![发布网页应用、选择谁能打开](docs/images/zh/apps.png)
 
 ### 查找和分享 Skill
 
@@ -30,7 +30,7 @@ Skill 广场扫描本机 agent 已装的 Skill，标出落后的副本、缺失�
 
 额外本机 agent 或追加扫描路径用 `skill_harnesses`，额外只读快照目录用 `skill_snapshots` 配置。把 Skill 安装或更新到 agent 中仍是单独的操作，广场提供可复制给 agent 的说明。
 
-<!-- screenshot: skills -->
+![各家 agent 装的 Skill，标出过期和损坏的副本](docs/images/zh/skills.png)
 
 ### 看待办、首页和待批准事项
 

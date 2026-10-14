@@ -52,7 +52,7 @@ python -m pip install .
 
 这会在当前 Python 环境中安装 `onestead`、`onestead-mcp`、`onestead-remote` 和 `onestead-backup`。后续步骤继续使用同一个环境。
 
-上面的普通安装 `pip install .` 不能使用可选的源码仓库备份。如果需要这项备份，请保留源码 git 仓库目录，改用 editable 安装：
+上面的普通安装 `pip install .` 后，`onestead-backup` 自己找不到源码仓库，只会备份数据仓库，并在备份清单里写明原因。如果要连源码仓库一起备份，请保留源码 git 仓库目录，把 `source_repo`（或环境变量 `ONESTEAD_SOURCE_REPO`）配置为它，或在其中改用 editable 安装：
 
 ```powershell
 python -m pip install -e .
@@ -169,10 +169,11 @@ Onestead 不管理对话记忆，不给 agent 派活，不选择模型，也不�
 | `reserved_slugs` | 额外保留的应用短名。 |
 | `state_dir` | 本机运行状态目录。 |
 | `backup_dir` | 可选的本机备份根目录，不填则关闭备份；使用不向云端同步的目录。 |
+| `source_repo` | 可选，备份时打包的源码 git 仓库（`ONESTEAD_SOURCE_REPO`）；不填则按程序位置往上找，找不到就只备份数据并写明原因。 |
 | `skill_harnesses` | 额外本机 agent，或追加到内置 Skill agent 的路径。 |
 | `skill_snapshots` | 额外的只读 Skill 快照目录。 |
 
-配置 `backup_dir` 后，`onestead-backup` 打包没有未提交改动的数据仓库和源码仓库。它假定程序位于源码 git 仓库内。快速开始中的普通安装 `pip install .` 不能使用这项源码备份；请保留源码 git 仓库目录，并在其中运行 `pip install -e .`。上传的应用文件和认证状态需要另行备份。
+配置 `backup_dir` 后，`onestead-backup` 打包没有未提交改动的数据仓库和源码仓库。源码仓库优先用 `source_repo`（或 `ONESTEAD_SOURCE_REPO`）；不配时从程序所在目录往上找同时有 `.git` 和 `pyproject.toml` 的目录。快速开始中的普通安装 `pip install .` 找不到，这时只备份数据仓库，`MANIFEST.json` 和 `RESTORE.md` 会写明原因；要备份源码，配置 `source_repo` 或改用 `pip install -e .`。上传的应用文件和认证状态需要另行备份。
 
 ## 常见问题
 

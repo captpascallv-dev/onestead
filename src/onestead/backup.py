@@ -26,7 +26,17 @@ from .gitops import NO_WINDOW
 from . import config
 from .store import TAIPEI
 
-CODE_REPO = Path(__file__).resolve().parents[2]
+
+
+def _find_checkout(start: Path) -> Path | None:
+    """从包所在目录往上找源码 checkout：同时有 .git 和 pyproject.toml 才算。"""
+    for folder in (start, *start.parents):
+        if (folder / ".git").exists() and (folder / "pyproject.toml").is_file():
+            return folder
+    return None
+
+
+CODE_REPO = _find_checkout(Path(__file__).resolve().parent)
 PRODUCT = "Company Base"
 log = logging.getLogger("onestead.backup")
 
@@ -110,6 +120,19 @@ def _to_recycle_bin(path: Path) -> None:
     log.warning("临时目录没能移进回收站，保留在：%s", path)
 
 
+def _code_repo() -> tuple[Path | None, str | None]:
+    """返回 (代码仓库, 没备份的原因)。配置了 source_repo 就只用它，不合格直接报错。"""
+    configured = config.source_repo()
+    if configured is not None:
+        repo = configured.resolve()
+        if not (repo / ".git").exists() or not (repo / "pyproject.toml").is_file():
+            raise SystemExit(f"source_repo 不是源码 git 仓库（要有 .git 和 pyproject.toml）：{repo}")
+        return repo, None
+    if CODE_REPO is None:
+        return None, "程序不在源码 git 仓库里运行（例如普通 pip install . 安装），往上没找到同时有 .git 和 pyproject.toml 的目录"
+    return CODE_REPO, None
+
+
 def rotate() -> dict:
     root = config.backup_dir()
     if root is None:
@@ -119,7 +142,8 @@ def rotate() -> dict:
     data_repo = Path(config.data_dir())
     now = datetime.now(TAIPEI)
     data_sha = _git("rev-parse", "HEAD", cwd=data_repo)[:7]
-    code_sha = _git("rev-parse", "HEAD", cwd=CODE_REPO)[:7]
+    code_repo, code_skipped = _code_repo()
+    code_sha = _git("rev-parse", "HEAD", cwd=code_repo)[:7] if code_repo else "none"
     cur, prev = _slot(project, "01-current-complete-"), _slot(project, "02-previous-complete-")
     tag = f"data{data_sha}-code{code_sha}"
     if cur and tag in cur.name:
@@ -132,7 +156,7 @@ def rotate() -> dict:
     verify_dir = Path(tempfile.mkdtemp(prefix="company-base-backup-verify-"))
     try:
         data = _pack(data_repo, "company-base-data", staging, verify_dir)
-        code = _pack(CODE_REPO, "company-base", staging, verify_dir)
+        code = _pack(code_repo, "company-base", staging, verify_dir) if code_repo else None
     except BaseException:
         _to_recycle_bin(staging)  # 本次刚建、还没成型的临时槽位，移进回收站
         raise
@@ -143,6 +167,9 @@ def rotate() -> dict:
         "created_at": now.isoformat(timespec="seconds"),
         "sensitivity": "LOCAL_ONLY：数据仓库含限定内容，只能放本机，不得放进会同步到云端的目录",
         "repos": {"data": data, "code": code},
+        **({"code_not_backed_up": {"reason": code_skipped,
+                                   "hint": "这次没有备份代码仓库；要备份可配置 source_repo 或 ONESTEAD_SOURCE_REPO"}}
+           if code is None else {}),
         "verification": {"bundle_verify": "pass", "independent_clone": "pass（--no-checkout，分支指向该提交）",
                          "zip_testzip": "pass", "zip_files_equal_tracked_files": "pass"},
     }
@@ -150,7 +177,9 @@ def rotate() -> dict:
     (staging / "RESTORE.md").write_text(
         "# 恢复 Onestead\n\n"
         f"- 数据仓库：提交 `{data['commit']}`（{data['commit_subject']}）\n"
-        f"- 代码仓库：提交 `{code['commit']}`（{code['commit_subject']}）\n"
+        + (f"- 代码仓库：提交 `{code['commit']}`（{code['commit_subject']}）\n" if code else
+           f"- 代码仓库：这次没有备份代码仓库，原因：{code_skipped}。要备份可配置 `source_repo`"
+           "（或环境变量 `ONESTEAD_SOURCE_REPO`）指向源码 git 仓库。\n") +
         "- 只要文件：解压对应的 `*-source.zip`。\n"
         "- 要完整历史：`git clone \"<本目录>/<对应的 .bundle>\" <新目录>`。\n"
         "- 恢复前先核对 `MANIFEST.json` 里各文件的 sha256。\n"
@@ -183,7 +212,10 @@ def rotate() -> dict:
                   "current": moved["current"], "previous": moved.get("previous"),
                   "sensitivity": "LOCAL_ONLY", "updated_at": now.isoformat(timespec="seconds")})
     idx_path.write_text(json.dumps(idx, ensure_ascii=False, indent=2), encoding="utf-8")
-    return {"data": data["short"], "code": code["short"], **moved}
+    result = {"data": data["short"], "code": code["short"] if code else None, **moved}
+    if code is None:
+        result["code_not_backed_up"] = code_skipped
+    return result
 
 
 def main() -> None:

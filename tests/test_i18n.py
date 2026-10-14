@@ -152,3 +152,15 @@ def test_site_prompts_and_values_are_not_translated(ext, repo, tmp_path, monkeyp
         assert ("This link expired" if lang == "en" else "链接已失效") in expired.text
         form = c.get("/login?return_to=%2Fsites%2Fenter%3Fslug%3Ddemo")
         assert ("Sign in to" if lang == "en" else "登录Onestead") in form.text
+
+
+@pytest.mark.parametrize("lang,prefix", [("zh", "\u7528\u6cd5\uff1a"), ("en", "usage: ")])
+@pytest.mark.parametrize("cmd", ["status", "whoami", "projects"])
+def test_subcommand_help_has_single_usage_prefix(monkeypatch, capsys, lang, prefix, cmd):
+    from onestead.cli import build_parser
+    monkeypatch.setenv("ONESTEAD_LANG", lang)
+    with pytest.raises(SystemExit):
+        build_parser().parse_args([cmd, "-h"])
+    first = capsys.readouterr().out.splitlines()[0]
+    assert first.startswith(prefix + "onestead " + cmd), first
+    assert first.count(prefix.strip()) == 1, first

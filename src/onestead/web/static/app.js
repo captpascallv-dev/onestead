@@ -217,8 +217,41 @@ function commitRow(c) {
            files: (c.visible_objects || []).map(o => ({ label: o.title })), diff: [], can_revert: false };
 }
 
-function statePill(state) {
-  return h("span", { class: "pill" + (state === DATA_VALUE.active ? " live" : "") }, uiLabel(state) || uiText("app.143"));
+function statePill(state, project) {
+  const cls = "pill" + (state === DATA_VALUE.active ? " live" : ""), text = uiLabel(state) || uiText("app.143");
+  // 只有本机主人能点（和“管理”页的改文档同一个权限）；其他人照旧只显示。
+  if (!project?.id || !allowed(project, "edit", "edit_sources")) return h("span", { class: cls }, text);
+  return h("button", { class: cls + " state-pick", type: "button", title: uiText("app.163"), "aria-label": uiText("app.163"),
+                       onclick: e => { e.stopPropagation(); return pickState(project.id); } }, text);
+}
+
+// 首页、项目列表上点状态：读 /api/source 的 state 选项，带 version 存回 /api/source/save。
+async function pickState(pid) {
+  const rel = `projects/${pid}/project.md`, url = `/api/source?rel=${encodeURIComponent(rel)}`;
+  let s;
+  try { s = await api(url); } catch (e) { if (e.message !== "401") toast(e.message); return; }
+  const field = (s.fields || []).find(f => f.key === "state");
+  if (!field) return toast(uiText("app.149"));
+  const choose = async value => {
+    if (value === field.value) return closeLayer();
+    try {
+      const r = await api("/api/source/save", { rel, version: s.version, changes: { state: value } });
+      if (r.error || r.ok === false) throw new Error(r.error || uiText("app.164"));
+    } catch (e) {
+      if (e.message === "401") return;
+      let now = null;
+      try { now = await api(url); } catch { /* 读不到就按原错误提示 */ }
+      toast(now && now.version !== s.version ? uiText("app.164") : e.message);
+      return;
+    }
+    closeLayer(); toast(uiText("app.165", [uiLabel(value)]));
+    S.rows = null; route();
+  };
+  openLayer(h("div", { class: "modal", role: "dialog", "aria-label": uiText("app.163") },
+    h("div", { class: "modal-head" }, h("div", {}, h("h3", { text: uiText("app.163") })),
+      h("button", { class: "btn ghost x", type: "button", "aria-label": uiText("app.041"), onclick: closeLayer }, icon(ICON.x))),
+    h("div", { class: "form-btns left state-options" }, (field.options || []).filter(Boolean).map(o =>
+      h("button", { class: "btn" + (o === field.value ? " primary" : ""), type: "button", "data-state": o, onclick: () => choose(o) }, uiLabel(o))))), "modal");
 }
 
 function secHead(title, n, more) {
@@ -356,7 +389,7 @@ async function showProject(pid) {
       allowed(p, "record_decision", "write_company") ? h("button", { class: "btn", type: "button", onclick: async () => {
         try { newDecisionForm(await api("/api/decisions"), p.id); } catch (e) { if (e.message !== "401") toast(e.message); }
       } }, uiText("app.118")) : null),
-    h("div", { class: "meta-line" }, statePill(p.state),
+    h("div", { class: "meta-line" }, statePill(p.state, p),
       p.summary_as_of ? h("span", { text: uiText("app.117", [md(p.summary_as_of)]) }) : h("span", { text: uiText("app.116") }),
       p.stale ? h("span", { class: "pill red", text: uiText("app.083") }) : null),
     reminders(p),
@@ -495,9 +528,9 @@ const MODULES = {
           h("th", { class: i === 5 ? "num" : (i === 3 || i === 4 ? "hide-sm" : null), text: t })))),
         h("tbody", {}, rows.map(r => h("tr", { class: "click", onclick: () => showProject(r.id) },
           h("td", {}, h("div", { class: "cell-name", text: r.name }), r.goal ? h("div", { class: "cell-sub", text: r.goal }) : null),
-          h("td", {}, statePill(r.state)),
+          h("td", {}, statePill(r.state, r)),
           h("td", {}, r.lead ? [h("div", { text: r.lead.who }), h("div", { class: "cell-sub", text: r.lead.role })] : h("span", { class: "faint", text: "—" })),
-          h("td", { class: "hide-sm nowrap" }, r.last ? [h("div", { text: ago(r.last) }), h("div", { class: "cell-sub", text: r.last_by })] : h("span", { class: "faint", text: "—" })),
+          h("td", { class: "hide-sm nowrap" }, r.last ? [h("div", { text: ago(r.last) }), h("div", { class: "cell-sub", text: uiLabel(r.last_by) })] : h("span", { class: "faint", text: "—" })),
           h("td", { class: "hide-sm nowrap" },
             h("div", {}, r.summary_as_of ? h("span", { text: md(r.summary_as_of) }) : h("span", { class: "faint", text: uiText("app.085") }),
               r.newer_status ? [" ", h("span", { class: "pill", text: uiText("app.084") })] : null),

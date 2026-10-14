@@ -67,6 +67,29 @@ context.findButton = (node, text) => node.querySelectorAll('button').find(x => x
 '''
 
 CASES = {
+    "首页点状态直接改": r'''
+await loadMe(); await renderProjects();
+assert.equal(document.getElementById('page').querySelector('button.state-pick'), null);
+payloads = LOCAL; await loadMe(); location.hash = '#/projects'; await renderProjects();
+const pill = document.getElementById('page').querySelector('button.state-pick');
+assert.ok(pill);
+const rel = 'projects%2Falpha%2Fproject.md';
+payloads['/api/source?rel=' + rel] = { rel: 'projects/alpha/project.md', version: 'v1', fields: [{ key: 'state', value: '进行中', options: ['进行中', '暂停', '已结束'] }] };
+payloads['/api/source/save'] = { ok: true, message: '已保存' };
+await pill.fire('click');
+assert.ok(layer().querySelector('.state-options'));
+const before = calls.filter(x => x[0] === '/api/source/save').length;
+await layer().querySelector('button[data-state=暂停]').fire('click');
+const saves = calls.filter(x => x[0] === '/api/source/save');
+assert.equal(saves.length, before + 1);
+assert.deepEqual(JSON.parse(saves.at(-1)[1].body), { rel: 'projects/alpha/project.md', version: 'v1', changes: { state: '暂停' } });
+assert.equal(layer().querySelector('.state-options'), null);
+payloads['/api/source/save'] = { ok: false, error: '被别人改过' };
+await document.getElementById('page').querySelector('button.state-pick').fire('click');
+payloads['/api/source?rel=' + rel] = { ...payloads['/api/source?rel=' + rel], version: 'v2' };
+await layer().querySelector('button[data-state=已结束]').fire('click');
+assert.ok(document.body.textContent.includes(uiText('app.164')));
+''',
     "双语优先级与即时切换": r'''
 assert.equal(resolveLanguage('zh', null, ['fr-FR']), 'zh');
 assert.equal(resolveLanguage('zh', null, ['en-US']), 'en');

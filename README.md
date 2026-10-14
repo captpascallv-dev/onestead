@@ -52,7 +52,7 @@ python -m pip install .
 
 This installs `onestead`, `onestead-mcp`, `onestead-remote`, and `onestead-backup` into that Python environment. Keep using the same environment for the steps below.
 
-The ordinary `pip install .` above cannot use the optional source-repository backup. If you need that backup, keep the source git checkout and use an editable installation instead:
+With the ordinary `pip install .` above, `onestead-backup` cannot find the source repository by itself, so it backs up only the data repository and records why in the backup manifest. To include the source repository, keep the source git checkout and set `source_repo` (or `ONESTEAD_SOURCE_REPO`) to it, or use an editable installation from that checkout:
 
 ```powershell
 python -m pip install -e .
@@ -169,10 +169,11 @@ It is not a credential vault. Web publishing serves static files; it does not ru
 | `reserved_slugs` | Additional app names to reserve. |
 | `state_dir` | Local runtime state directory. |
 | `backup_dir` | Optional local backup root; backups are disabled when unset. Use a directory that is not synced to the cloud. |
+| `source_repo` | Optional source git checkout to include in backups (`ONESTEAD_SOURCE_REPO`). When unset, found from the package location; skipped with a note if not found. |
 | `skill_harnesses` | Extra local agents or paths appended to built-in Skill agents. |
 | `skill_snapshots` | Extra read-only Skill snapshot directories. |
 
-With `backup_dir` configured, `onestead-backup` packs clean data and source repositories. It assumes the package runs inside the source git checkout. The ordinary `pip install .` in Quick start cannot use this source backup; use `pip install -e .` from a retained source git checkout instead. Uploaded app files and authentication state need separate backups.
+With `backup_dir` configured, `onestead-backup` packs clean data and source repositories. The source repository is `source_repo` (or `ONESTEAD_SOURCE_REPO`) when set; otherwise it is the git checkout found by walking up from the installed package (a directory with both `.git` and `pyproject.toml`). After the ordinary `pip install .` none is found, so only the data repository is backed up and `MANIFEST.json` and `RESTORE.md` say why; set `source_repo` or use `pip install -e .` to include it. Uploaded app files and authentication state need separate backups.
 
 ## FAQ
 

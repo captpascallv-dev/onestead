@@ -281,6 +281,37 @@ def test_backup_verification_and_rotation_in_sandbox(backup_sandbox, monkeypatch
     assert len(recycled) == 3 and all(path.parent == root.parent for path in recycled)
 
 
+def test_backup_without_code_repo_backs_up_data_only(backup_sandbox, monkeypatch):
+    root, code, data, recycled = backup_sandbox
+    monkeypatch.setattr(backup, "CODE_REPO", None)
+    result = backup.rotate()
+    assert result["code"] is None and "pip install" in result["code_not_backed_up"]
+    slot = root / "Company-Base" / result["current"]
+    manifest = json.loads((slot / "MANIFEST.json").read_text(encoding="utf-8"))
+    assert manifest["repos"]["code"] is None
+    assert "source_repo" in manifest["code_not_backed_up"]["hint"]
+    assert "这次没有备份代码仓库" in (slot / "RESTORE.md").read_text(encoding="utf-8")
+    assert [p.name for p in slot.glob("company-base-*")] and all(p.name.startswith("company-base-data-") for p in slot.glob("company-base-*"))
+    assert list(slot.glob("company-base-data-*-source.zip"))
+
+
+def test_backup_uses_configured_source_repo(backup_sandbox, monkeypatch):
+    root, code, data, recycled = backup_sandbox
+    (code / "pyproject.toml").write_text("[project]\nname = \"demo\"\n", encoding="utf-8")
+    git(code, "add", ".")
+    git(code, "commit", "-qm", "加 pyproject")
+    monkeypatch.setattr(backup, "CODE_REPO", None)
+    monkeypatch.setenv("ONESTEAD_SOURCE_REPO", str(code))
+    result = backup.rotate()
+    slot = root / "Company-Base" / result["current"]
+    manifest = json.loads((slot / "MANIFEST.json").read_text(encoding="utf-8"))
+    assert manifest["repos"]["code"]["repo"] == str(code.resolve())
+    assert "code_not_backed_up" not in manifest
+    monkeypatch.setenv("ONESTEAD_SOURCE_REPO", str(root))
+    with pytest.raises(SystemExit, match="source_repo"):
+        backup.rotate()
+
+
 def test_failed_verification_keeps_current_slot(backup_sandbox, monkeypatch):
     root, code, data, recycled = backup_sandbox
     first = backup.rotate()

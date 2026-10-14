@@ -147,6 +147,9 @@ button.list-row { width: 100%; background: none; text-align: left; cursor: point
 .pill.live::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .pill.accent { background: var(--accent-tint); color: var(--accent); }
 .pill.red { background: var(--red-tint); color: var(--red); }
+button.pill.state-pick { border: 0; cursor: pointer; font: inherit; font-size: 12px; }
+button.pill.state-pick:hover { box-shadow: inset 0 0 0 1px currentColor; }
+.modal .state-options { justify-content: flex-start; flex-wrap: wrap; padding: 6px 24px 22px; margin-top: 8px; }
 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--label-3); display: inline-block; }
 .dot.on { background: var(--accent); }
 .avatar { width: 26px; height: 26px; line-height: 1; border-radius: 50%; flex: none; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #fff; background: linear-gradient(160deg, #A1A1A8, #7C7C84); }

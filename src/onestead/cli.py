@@ -53,7 +53,10 @@ def _text(args, field: str) -> str | None:
 
 class LocalizedFormatter(argparse.HelpFormatter):
     def add_usage(self, usage, actions, groups, prefix=None):
-        return super().add_usage(usage, actions, groups, prefix or tr("cli.usage"))
+        # argparse 给子命令算 prog 时传 prefix=""，只在 None 时才补本地化前缀。
+        if prefix is None:
+            prefix = tr("cli.usage")
+        return super().add_usage(usage, actions, groups, prefix)
 
 
 class LocalizedParser(argparse.ArgumentParser):

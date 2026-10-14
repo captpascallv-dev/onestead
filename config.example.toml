@@ -19,6 +19,9 @@ owner_key = "<主人键>"
 # 可选备份根目录；可用 ONESTEAD_BACKUP_DIR。不配就不备份，空环境变量也会关闭备份。
 # 只选本机且不向云端同步的目录；保留现有备份槽位、_待删除 和 INDEX.json 的格式。
 # backup_dir = "<备份根目录>"
+# 可选：备份时打包的代码仓库（源码 git checkout）；可用 ONESTEAD_SOURCE_REPO。
+# 不配时从程序所在目录往上找；普通 pip install . 找不到，就只备份数据仓库并在清单里写明原因。
+# source_repo = "<源码仓库目录>"
 # 额外本机工具的 Skill 目录；可用 ONESTEAD_SKILL_HARNESSES（旧名 COMPANY_BASE_SKILL_HARNESSES，JSON 列表）。
 # 每项有 key、name、user，可选 builtin、plugins；路径均为列表，~ 展开为进程用户的家目录。
 # 同 key 追加路径并保留内置名称；新 key 添加本机工具，与内置项一样参与比对、分享和安装提示，不是快照。

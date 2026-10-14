@@ -50,6 +50,16 @@ def test_save_doc_changes_level_and_body_then_refuses_stale_version(repo, owner)
         owner.save_doc("assets/sample.md", s["version"], {"title": "再改"}, None)
 
 
+def test_save_doc_changes_project_state_with_version(repo, owner):
+    s = owner.doc_source("projects/alpha/project.md")
+    field = next(f for f in s["fields"] if f["key"] == "state")
+    target = next(x for x in field["options"] if x and x != field["value"])
+    owner.save_doc(s["rel"], s["version"], {"state": target}, None)
+    assert f"state: {target}" in read(repo, "projects/alpha/project.md")
+    with pytest.raises(BaseError, match="被别人改过"):
+        owner.save_doc(s["rel"], s["version"], {"state": field["value"]}, None)
+
+
 def test_save_without_changes_makes_no_commit(repo, owner):
     s = owner.doc_source("handbook/company.md")
     before = git(repo, "rev-parse", "HEAD")

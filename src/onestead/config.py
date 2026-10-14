@@ -218,6 +218,12 @@ def backup_dir() -> Path | None:
     return Path(value) if value else None
 
 
+def source_repo() -> Path | None:
+    """备份时要打包的代码仓库；不配置就从包所在目录往上找源码 checkout。"""
+    value = _text("source_repo", "SOURCE_REPO")
+    return Path(value) if value else None
+
+
 def invalidate() -> None:
     """配置文件刚被写过时清掉缓存，同一次进程里下一回读到新内容。"""
     global _cached

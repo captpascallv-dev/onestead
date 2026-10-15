@@ -2,7 +2,8 @@
 
 - 已经有一个在跑：直接用浏览器打开它，不起第二个；
 - 没有：在 127.0.0.1 的空闲端口上起服务，生成本次的随机口令，打开浏览器；
-- 页面每 20 秒发一次心跳，24 小时收不到就自己退出；退出时仅在配置 backup_dir 后备份轮转。
+- 页面每 20 秒发一次心跳，24 小时收不到就自己退出；
+- 配置了 backup_dir 才备份：运行期间启动 5 分钟后备一次、之后每 6 小时一次，退出时再备一次。
 """
 
 from __future__ import annotations
@@ -23,6 +24,10 @@ from .. import config
 
 # 浏览器会让后台标签页睡着、电脑会合盖过夜，那时页面发不出心跳；不能因此就退，一整天没动静才退出。
 IDLE_EXIT = 24 * 3600  # 秒
+# 网页可能连开好几天、也可能被强制结束，只靠退出时备份会断档；运行期间启动后先备一次，之后每隔这么久再备。
+BACKUP_FIRST = 300  # 秒
+BACKUP_EVERY = 6 * 3600  # 秒
+_backup_lock = threading.Lock()
 # 端口和钥匙跨重启沿用：后台重开过，旧标签页一刷新就能接上，地址也能收藏。钥匙满 30 天换一把。
 UI_PORT = 8764
 TOKEN_DAYS = 30
@@ -128,11 +133,23 @@ def _serve(data_root: str) -> None:
                 log.info("超过 %s 秒没有心跳，退出", IDLE_EXIT)
                 server.should_exit = True
 
-    state = {"pid": os.getpid(), "port": port, "token": token,
+    def scheduled_backup():
+        wait = BACKUP_FIRST
+        while not server.should_exit:
+            deadline = time.monotonic() + wait
+            while not server.should_exit and time.monotonic() < deadline:
+                time.sleep(5)
+            if server.should_exit:
+                return
+            _backup(data_root)  # 提交没变时 rotate 自己跳过
+            wait = BACKUP_EVERY
+
+    state ={"pid": os.getpid(), "port": port, "token": token,
              "started_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
     _write_private(config.state_dir() / "ui-state.json", json.dumps(state))
     (config.state_dir() / "ui-start.lock").unlink(missing_ok=True)
     threading.Thread(target=watchdog, daemon=True).start()
+    threading.Thread(target=scheduled_backup, daemon=True).start()
     threading.Timer(0.8, _open, args=(state,)).start()
     log.info("启动：端口 %s，数据仓库 %s", port, data_root)
     try:
@@ -144,6 +161,11 @@ def _serve(data_root: str) -> None:
 
 
 def _backup(data_root: str) -> None:
+    with _backup_lock:  # 定时备份和退出备份不同时跑
+        _backup_once(data_root)
+
+
+def _backup_once(data_root: str) -> None:
     try:
         if config.backup_dir() is None:
             log.info("没配 backup_dir，不备份")

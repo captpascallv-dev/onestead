@@ -450,14 +450,14 @@ class CompanyBase(TodoMixin, AppMixin, SkillMixin, ManageMixin, HomeMixin, Token
         return f"## {self._now():%Y-%m-%d %H:%M} · {who}\n\n{text}\n"
 
     def _may_create_project(self, viewer: Viewer) -> bool:
-        """全读且能写、又不是远程进来的：本机伙伴和网页上的 主人。"""
-        return bool(viewer.known and viewer.valid and viewer.can_write and not viewer.remote
+        """全读且能写：主人、本机伙伴，以及远程接入的全读伙伴（如网页版 ChatGPT）。只看指定项目的成员不能建。"""
+        return bool(viewer.known and viewer.valid and viewer.can_write
                     and not viewer.assigned and (viewer.is_owner or viewer.access_mode == "full"))
 
     def create_project(self, project_id: str, title: str, goal: str, state: str = "构想中",
                        body: str | None = None, sensitivity: str = "internal",
                        signed_as: str | None = None) -> str:
-        """新建项目，只写 projects/<id>/project.md。网页上的 主人 和本机全读伙伴都能调。"""
+        """新建项目，只写 projects/<id>/project.md。主人和全读能写的伙伴（本机或远程）都能调。"""
         signed_as = self._sign(signed_as)
         with self._write():
             viewer, docs, _ = self._ctx()

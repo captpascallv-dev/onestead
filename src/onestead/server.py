@@ -369,8 +369,11 @@ def remote_app(root: str, port: int, host: str = "127.0.0.1", public_host: str |
     外面的请求带的主机名是 public_host（例如 base.example.com），HTTPS 由 Cloudflare 那头负责。
     拼装在 web.host：命令行和 online 仍从这里拿到应用。
     """
+    from . import folders
     from .web.host import remote_app as mount
 
+    if config.shared_folders():
+        folders.warm()  # 后台先抽好共享文件夹的文字，第一次搜索不用等
     return mount(root, port, host, public_host, web_test_origin=web_test_origin)
 
 

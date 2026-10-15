@@ -170,12 +170,24 @@ def test_remote_colleague_archive_and_create_are_closed(ext, repo):
         assert git(repo, "rev-parse", "HEAD") == before
     finally:
         origin_client.close()
-    with pytest.raises(BaseError, match=f"新建项目请找 {OWNER_NAME}"):
+    with pytest.raises(BaseError, match=f"不能新建项目；请 {OWNER_NAME} 在网页上建"):
         ext("ext-zhang").create_project("nope", "不该建成", "不该建成")
-    with pytest.raises(BaseError, match=f"新建项目请找 {OWNER_NAME}"):
+    with pytest.raises(BaseError, match=f"不能新建项目；请 {OWNER_NAME} 在网页上建"):
         CompanyBase(repo, "ext-zhang", require_remote=True).create_project("nope", "不该建成", "不该建成")
-    with pytest.raises(BaseError, match=f"新建项目请找 {OWNER_NAME}"):
+    with pytest.raises(BaseError, match=f"不能新建项目；请 {OWNER_NAME} 在网页上建"):
         ext("reader").create_project("nope", "不该建成", "不该建成")
+
+
+def test_remote_full_agent_can_create_project(repo):
+    """远程接入的全读能写伙伴（如网页版 ChatGPT）也能新建项目。"""
+    member = repo / "people" / "claude.md"
+    member.write_text(member.read_text(encoding="utf-8").replace("remote_enabled: false", "remote_enabled: true"),
+                      encoding="utf-8")
+    git(repo, "commit", "-qam", "claude 可远程接入")
+    message = CompanyBase(repo, "claude", require_remote=True).create_project(
+        "remote-made", "远程建的", "远程全读伙伴新建", signed_as="claude")
+    assert "remote-made" in message
+    assert (repo / "projects" / "remote-made" / "project.md").is_file()
 
 
 def test_colleague_directory_skips_archived(ext, repo):

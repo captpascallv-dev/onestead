@@ -35,3 +35,9 @@ skill_snapshots = []
 # skill_snapshots = [{key = "assistant", name = "远程环境", root = "<快照目录>", layout = {type = "latest-subdir", pattern = "skills-*", subpaths = ["exports/user-workflows", "exports/third-party"]}}]
 # ONESTEAD_TOKENS、ONESTEAD_USAGE_LOG、ONESTEAD_FEISHU_DIR 覆盖各状态文件位置；ONESTEAD_USAGE_LOG 空值关闭日志。
 # ONESTEAD_SKILL_HOME 覆盖扫描的 home；ONESTEAD_CLOUDFLARED 指定隧道程序位置。
+
+# 可选：把本机文件夹只读开放给指定伙伴（目前经网页版 ChatGPT 的 search / fetch 读）；可用 ONESTEAD_SHARED_FOLDERS（JSON 列表）。
+# readers 写成员的 agent_key；只读白名单类型（md、txt、csv、json、html、pdf、docx、pptx、xlsx），
+# 自动跳过符号链接、目录联接、浏览器登录资料和名字带凭据字样的文件；exclude 写相对文件夹的路径或通配符。
+# 抽 PDF、Word、PPT、Excel 文字要装 onestead[docs]。
+# shared_folders = [{key = "research", name = "调研资料", path = "<文件夹>", readers = ["<agent_key>"], exclude = ["<相对路径>"]}]

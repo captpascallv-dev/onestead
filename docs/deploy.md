@@ -16,7 +16,7 @@ The local web app:
 python -m onestead.web
 ```
 
-It prefers port `8764` on `127.0.0.1`, falls back to a free port, and opens a session-bootstrap URL in the default browser. The session token is reused for up to 30 days. It exits after 24 hours without a heartbeat and backs up only when `backup_dir` is configured. That port is for a browser on this computer. The cookie is `cb_session_<port>`. The `Host` header must be exactly `127.0.0.1:<port>`.
+It prefers port `8764` on `127.0.0.1`, falls back to a free port, and opens a session-bootstrap URL in the default browser. The session token is reused for up to 30 days. It exits after 24 hours without a heartbeat. When `backup_dir` is configured, it backs up 5 minutes after start, every 6 hours while running, and on exit; unchanged commits are skipped. That port is for a browser on this computer. The cookie is `cb_session_<port>`. The `Host` header must be exactly `127.0.0.1:<port>`.
 
 The remote server:
 
@@ -250,6 +250,7 @@ For the keys below, the environment variable wins over the file. An empty string
 | `source_repo` | `ONESTEAD_SOURCE_REPO` | The source git checkout the package runs from, if any. Must contain `.git` and `pyproject.toml`; a bad value is an error. Without a checkout, backups cover the data repository only. |
 | `skill_harnesses` | `ONESTEAD_SKILL_HARNESSES` | No extra local tools or paths. The variable is a JSON list; legacy `COMPANY_BASE_SKILL_HARNESSES` is also supported, with the new name taking precedence, including explicit empty values. Each item has non-empty `key` and `name`, a `user` path list, and optional `builtin` and `plugins` path lists. Paths must be non-empty strings; `~` expands to the process user's home. A matching key appends paths and keeps the built-in name; a new key adds a local agent with the same scan, comparison, sharing, and installation-hint behavior as built-in agents, not a snapshot. A bad shape is an error. |
 | `skill_snapshots` | `ONESTEAD_SKILL_SNAPSHOTS` | No extra snapshots. The built-in scan list is unchanged. The variable is a JSON list. Each item has non-empty `key`, `name`, and `root`. A bad shape is an error. |
+| `shared_folders` | `ONESTEAD_SHARED_FOLDERS` | No shared folders. A list of local folders opened read-only to the members named in `readers` (agent keys), currently through the ChatGPT connector's `search` and `fetch`. Each item has a unique lowercase `key`, `name`, `path`, a non-empty `readers` list, and an optional `exclude` list of paths or globs relative to the folder. Only `.md .txt .csv .json .html .htm .pdf .docx .pptx .xlsx` files are read; symlinks, junctions, browser profile folders, and names that look like secrets, tokens, cookies, credentials, `.env`, or `*.local.*` are skipped, and requested paths must stay inside the folder. Text goes through the usual redaction. Office and PDF text extraction needs `pip install onestead[docs]`. These files never appear in the web app or colleague views. |
 
 `ONESTEAD_TOKENS` replaces `tokens.json`. `ONESTEAD_USAGE_LOG` replaces the usage log, and an empty value turns the log off. `ONESTEAD_FEISHU_DIR` replaces the Feishu directory. `ONESTEAD_SKILL_HOME` overrides the home used by the built-in skill scan. `ONESTEAD_CLOUDFLARED` points at the tunnel binary.
 

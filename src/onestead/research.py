@@ -1,4 +1,4 @@
-"""Deep Research 的文档接口；复用远程搜索的投影，不读取任意给定路径。"""
+"""Deep Research 的文档接口；复用远程搜索的投影，外加主人点名开放的共享文件夹，不读取任意给定路径。"""
 
 from .i18n import text as tr
 
@@ -6,6 +6,7 @@ from urllib.parse import quote
 
 from pydantic import BaseModel
 
+from . import folders
 from .redact import safe_text
 from .store import BaseError
 
@@ -50,13 +51,34 @@ def projected_items(base, terms, origin):
     return items
 
 
+def _reader(base):
+    viewer, _, _ = base._ctx()
+    return viewer.key if viewer.known and viewer.valid else None
+
+
+def _folder_url(origin, document_id):
+    # 共享文件夹没有网页，给一个带文档 ID 的地址供引用
+    return origin + "/#/folder/" + quote(document_id, safe="/")
+
+
 def search(base, query, origin):
     terms = [term.lower() for term in (query or "").split()]
-    return SearchOutput(results=[SearchResult(**{k: row[k] for k in ("id", "title", "url")})
-                                 for row in projected_items(base, terms, origin)[:50]] if terms else [])
+    if not terms:
+        return SearchOutput(results=[])
+    rows = [{k: row[k] for k in ("id", "title", "url")} for row in projected_items(base, terms, origin)[:50]]
+    rows += [{"id": row["id"], "title": safe_text(row["title"]), "url": _folder_url(origin, row["id"])}
+             for row in folders.search(_reader(base), terms, limit=50)]
+    return SearchOutput(results=[SearchResult(**row) for row in rows])
 
 
 def fetch(base, document_id, origin):
+    if folders.parse_id(document_id or ""):
+        # 共享文件夹：只在这个身份能读的文件夹里、按白名单规则解析，隐藏和不存在同一个错误。
+        row = folders.fetch(_reader(base), document_id)
+        if row is None:
+            raise BaseError(tr("agent.353"))
+        return FetchOutput(id=row["id"], title=safe_text(row["title"]), text=safe_text(row["text"]),
+                           url=_folder_url(origin, row["id"]), metadata=row["metadata"])
     # 只按可见投影里的精确 ID 找，不做文件系统路径解析，隐藏和不存在同一个错误。
     row = next((row for row in projected_items(base, [], origin) if row["id"] == document_id), None)
     if row is None:

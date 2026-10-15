@@ -180,7 +180,7 @@ TEXT.update({
     'agent.133': ('，已下架', ', unlisted'),
     'agent.134': ('# 搜索「{v0}」：{v1} 处', '# Search “{v0}”: {v1} matches'),
     'agent.135': (' · 项目：`{v0}`', ' · Project: `{v0}`'),
-    'agent.136': ('新建项目请找 {v0}。', 'Ask {v0} to create a project.'),
+    'agent.136': ('你只能看或只负责指定的项目，不能新建项目；请 {v0} 在网页上建，或找本机的 agent 代建。', 'You can only see or work on assigned projects, so you cannot create one. Ask {v0} to create it on the web, or ask a local agent to create it.'),
     'agent.137': ('敏感级别只能是 public / internal / restricted。', 'Sensitivity must be public / internal / restricted.'),
     'agent.138': ('不能新建公开项目，请选 internal 或 restricted。公开会让所有同事看到。', 'Cannot create a public project. Choose internal or restricted. Public projects are visible to all teammates.'),
     'agent.139': ('id 用小写英文、数字和连字符，2 到 41 个字，例如 brand-guide。', 'id must use lowercase letters, digits, and hyphens, 2 to 41 characters, e.g. brand-guide.'),
@@ -711,6 +711,8 @@ TEXT.update({
     'agent.664': ('发布静态网页：构建目录要用绝对路径，根部有 index.html。首次须给短名，主人在网页上定谁能看。', 'Publish a static web app. Use an absolute build directory containing index.html at its root. Supply a slug for the first publication; the Owner sets visibility on the web.'),
     'agent.665': ('配置 skill_harnesses 要是列表，每项有非空的 key、name 和 user 路径列表；可选 builtin、plugins 也要是路径列表，路径不能为空。', 'Config skill_harnesses must be a list with nonempty key, name, and a user path list in each entry; optional builtin and plugins must also be path lists with nonempty paths.'),
     'agent.666': ('ONESTEAD_SKILL_HARNESSES 要是 JSON 列表，每项有 key、name、user，可选 builtin、plugins。', 'ONESTEAD_SKILL_HARNESSES must be a JSON list with key, name, and user in each entry, and optional builtin and plugins.'),
+    'agent.667': ('配置 shared_folders 要是列表，每项有非空的 key（小写字母、数字、连字符，不重复）、name、path 和非空的 readers 列表；可选 exclude 也要是路径列表。', 'shared_folders must be a list; each item needs a unique key (lowercase letters, digits, hyphens), non-empty name and path, a non-empty readers list, and an optional exclude list of paths.'),
+    'agent.668': ('ONESTEAD_SHARED_FOLDERS 要是 JSON 列表，每项有 key、name、path、readers，可选 exclude。', 'ONESTEAD_SHARED_FOLDERS must be a JSON list with key, name, path, readers, and optional exclude.'),
 })
 
 
@@ -724,6 +726,13 @@ def text(key: str, *, lang: str | None = None, **values) -> str:
 TEXT["mcp.instructions"] = tuple(
     value.replace("{{", "{").replace("}}", "}") for value in TEXT.pop("agent.369")
 )
+TEXT.update({
+    "folder.page": ("--- 第 {n} 页 ---", "--- Slide {n} ---"),
+    "folder.sheet": ("--- 工作表 {name} ---", "--- Sheet {name} ---"),
+    "folder.truncated": ("（正文太长，只给了前 {n} 字）", "(Text truncated to the first {n} characters.)"),
+    "folder.no_text": ("（这份文件里抽不出文字，可能是扫描件、图片或加密文件）", "(No text could be extracted. It may be a scan, an image, or an encrypted file.)"),
+    "folder.type": ("共享文件夹", "Shared folder"),
+})
 TEXT.update({
     "public_host_missing": ("还没配对外域名", "Public domain is not configured yet"),
     "skill_missing_prefix": ("找不到 Skill `", "Skill `"),

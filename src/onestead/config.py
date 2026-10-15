@@ -212,6 +212,29 @@ def skill_harnesses() -> list[dict]:
     return [dict(row) for row in rows]
 
 
+def shared_folders() -> list[dict]:
+    """开放给指定伙伴只读搜索的本机文件夹；每项有 key、name、path、readers，可选 exclude。"""
+    import re
+
+    override = env("SHARED_FOLDERS")
+    try:
+        rows = json.loads(override) if override is not None else load().get("shared_folders", [])
+    except json.JSONDecodeError:
+        raise _error("agent.668") from None
+    if not isinstance(rows, list) or not all(
+        isinstance(row, dict)
+        and all(isinstance(row.get(k), str) and row[k].strip() for k in ("key", "name", "path"))
+        and re.fullmatch(r"[a-z0-9][a-z0-9-]*", row["key"])
+        and isinstance(row.get("readers"), list) and row["readers"]
+        and all(isinstance(r, str) and r.strip() for r in row["readers"])
+        and isinstance(row.get("exclude", []), list)
+        and all(isinstance(p, str) and p.strip() for p in row.get("exclude", []))
+        for row in rows
+    ) or len({row["key"] for row in rows}) != len(rows):
+        raise _error("agent.667")
+    return [dict(row, exclude=list(row.get("exclude", []))) for row in rows]
+
+
 def backup_dir() -> Path | None:
     """备份由用户选择本机目录；不配置就不备份。"""
     value = _text("backup_dir", "BACKUP_DIR")

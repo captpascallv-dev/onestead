@@ -17,6 +17,10 @@ dependencies = [
     "send2trash>=1.8; sys_platform != 'win32'",
 ]
 
+[project.optional-dependencies]
+# 共享文件夹里抽 PDF、Word、PPT、Excel 的文字
+docs = ["pypdf>=5", "python-docx>=1.1", "python-pptx>=1.0", "openpyxl>=3.1"]
+
 [project.scripts]
 onestead-mcp = "onestead.server:main"
 onestead-remote = "onestead.server:main_remote"

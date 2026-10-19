@@ -13,6 +13,9 @@ roles:
     who: Codex
     since: 2026-08-15
 summary_as_of: 2026-10-08
+paths:
+  - C:/hearthleaf/shop
+  - C:/hearthleaf/launch-notes
 authority:
   label: Launch checklist
   path: C:/hearthleaf/launch-checklist.md

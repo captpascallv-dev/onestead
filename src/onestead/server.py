@@ -69,9 +69,11 @@ def build_server(root: str, agent_key: str | None, *, remote: bool = False, oaut
             raise ToolError(tr("agent.377", v0=safe_text(owner_name))) from None
 
     @mcp.tool(annotations=READ, description=tr("agent.635"))
-    def company() -> str:
+    def company(
+        cwd: Annotated[str | None, Field(description=tr("here.mcp_cwd"))] = None,
+    ) -> str:
         """入职说明：公司是什么、有哪些项目、谁在做、协作规矩和成员。新对话先调这个。"""
-        return run("company")
+        return run("company", cwd)
 
     @mcp.tool(annotations=READ, description=tr("agent.636"))
     def whoami() -> str:
@@ -99,10 +101,11 @@ def build_server(root: str, agent_key: str | None, *, remote: bool = False, oaut
         state: Annotated[str, Field(description=tr("agent.382"))] = "构想中",
         body: Annotated[str | None, Field(description=tr("agent.383"))] = None,
         sensitivity: Annotated[str, Field(description=tr("agent.384"))] = "internal",
+        paths: Annotated[list[str] | None, Field(description=tr("here.mcp_paths"))] = None,
         signed_as: Signed = None,
     ) -> str:
         """主人 或项目负责人让你开新项目时用；建完用 handover_role 把担任者登记上。"""
-        return run("create_project", project_id, title, goal, state, body, sensitivity, signed_as)
+        return run("create_project", project_id, title, goal, state, body, sensitivity, paths, signed_as)
 
     if oauth_provider:
         @mcp.tool(annotations=READ, description=tr("agent.661"))
@@ -373,7 +376,7 @@ def remote_app(root: str, port: int, host: str = "127.0.0.1", public_host: str |
     from .web.host import remote_app as mount
 
     if config.shared_folders():
-        folders.warm()  # 后台先抽好共享文件夹的文字，第一次搜索不用等
+        folders.warm()  # 后台同步落盘索引；同步期间搜索仍用已经建好的索引
     return mount(root, port, host, public_host, web_test_origin=web_test_origin)
 
 

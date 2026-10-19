@@ -230,6 +230,34 @@ With a root configured, the existing layout is retained: `Company-Base/01-curren
 
 Verification clones live in the system temporary directory. Windows retains its PowerShell recycle-bin behavior. macOS/Linux use `send2trash`; if recycling fails or is unavailable, the directory stays in place and the log gives its path. Failed staging directories follow the same non-destructive policy. POSIX trash integration is **not verified** on a real host.
 
+## Connect local agents
+
+`onestead connect` looks for Claude Code, Codex, and Cursor when that client's user-level config file or directory is already present. With no extra flag it prints each file and the `onestead` entry it would write. It does not write anything.
+
+`onestead connect --apply` writes those files. Before replacing an existing file it copies `<filename>.onestead-backup-<YYYYMMDD-HHMMSS>` into the same directory. The timestamp is UTC+8. The new contents are written to a temporary file in that directory and then replace the original. A file that already matches is left untouched and is not backed up again. The command reports that file as already up to date.
+
+The server name is `onestead`. The command is `onestead-mcp` from the current Python environment when that program exists; otherwise it is the current Python interpreter with `-m onestead.server`. The identity is the `ONESTEAD_AGENT` environment variable. `--agent-key` sets it when exactly one `--client` is given. Otherwise the command keeps `ONESTEAD_AGENT` or `COMPANY_BASE_AGENT` from an existing `company-base` entry, then from an existing `onestead` entry, and otherwise uses `claude`, `codex`, or `cursor` for those clients.
+
+If the same file still has a `company-base` entry, `--apply` removes it and writes `onestead` in its place. The preview says that the old entry will be replaced. The identity already stored on that entry is kept.
+
+`--client claude-code`, `--client codex`, and `--client cursor` limit which client is handled. Repeat the flag to select more than one. A client with neither a config file nor a config directory is omitted. If one file cannot be parsed, or its TOML cannot be edited safely, that client is skipped and the others are still written.
+
+| Client | User-level file |
+| --- | --- |
+| Claude Code | `~/.claude.json`. Only the `mcpServers` entry for this server is changed; every other key is kept. |
+| Codex | `$CODEX_HOME/config.toml`, or `~/.codex/config.toml` when `CODEX_HOME` is unset. The command writes `[mcp_servers.onestead]` and `[mcp_servers.onestead.env]`. |
+| Cursor | `~/.cursor/mcp.json`, under `mcpServers`. |
+
+Codex is edited as text. Old `mcp_servers.onestead` and `mcp_servers.company-base` table blocks are removed, including their subtables, and the new blocks are appended. Other text, including comments, stays byte for byte. A JSON file that does not parse, and a TOML file whose structure is not safe to edit this way, are left unchanged.
+
+```powershell
+onestead connect
+onestead connect --apply
+onestead connect --client codex --agent-key codex --apply
+```
+
+The blocks printed by `onestead init`, and the same instructions on the local "connect a new agent" page, remain available for anyone who would rather edit a file by hand.
+
 ## Configuration
 
 The process reads `~/.onestead/config.toml`, or the file named by `ONESTEAD_CONFIG`. Existing installations have a read-only fallback; see [Compatibility](../README.md#已有安装仍然兼容). A missing file is an empty config. A file that cannot be read, or that is not valid TOML, is an error.
@@ -250,7 +278,7 @@ For the keys below, the environment variable wins over the file. An empty string
 | `source_repo` | `ONESTEAD_SOURCE_REPO` | The source git checkout the package runs from, if any. Must contain `.git` and `pyproject.toml`; a bad value is an error. Without a checkout, backups cover the data repository only. |
 | `skill_harnesses` | `ONESTEAD_SKILL_HARNESSES` | No extra local tools or paths. The variable is a JSON list; legacy `COMPANY_BASE_SKILL_HARNESSES` is also supported, with the new name taking precedence, including explicit empty values. Each item has non-empty `key` and `name`, a `user` path list, and optional `builtin` and `plugins` path lists. Paths must be non-empty strings; `~` expands to the process user's home. A matching key appends paths and keeps the built-in name; a new key adds a local agent with the same scan, comparison, sharing, and installation-hint behavior as built-in agents, not a snapshot. A bad shape is an error. |
 | `skill_snapshots` | `ONESTEAD_SKILL_SNAPSHOTS` | No extra snapshots. The built-in scan list is unchanged. The variable is a JSON list. Each item has non-empty `key`, `name`, and `root`. A bad shape is an error. |
-| `shared_folders` | `ONESTEAD_SHARED_FOLDERS` | No shared folders. A list of local folders opened read-only to the members named in `readers` (agent keys), currently through the ChatGPT connector's `search` and `fetch`. Each item has a unique lowercase `key`, `name`, `path`, a non-empty `readers` list, and an optional `exclude` list of paths or globs relative to the folder. Only `.md .txt .csv .json .html .htm .pdf .docx .pptx .xlsx` files are read; symlinks, junctions, browser profile folders, and names that look like secrets, tokens, cookies, credentials, `.env`, or `*.local.*` are skipped, and requested paths must stay inside the folder. Text goes through the usual redaction. Office and PDF text extraction needs `pip install onestead[docs]`. These files never appear in the web app or colleague views. |
+| `shared_folders` | `ONESTEAD_SHARED_FOLDERS` | No shared folders. A list of local folders opened read-only to the members named in `readers` (agent keys), currently through the ChatGPT connector's `search` and `fetch`. Each item has a unique lowercase `key`, `name`, `path`, a non-empty `readers` list, and an optional `exclude` list of paths or globs relative to the folder. Only `.md .txt .csv .json .html .htm .pdf .docx .pptx .xlsx` files are read; symlinks, junctions, browser profile folders, and names that look like secrets, tokens, cookies, credentials, `.env`, or `*.local.*` are skipped, and requested paths must stay inside the folder. Text goes through the usual redaction. Office and PDF text extraction needs `pip install onestead[docs]`. These files never appear in the web app or colleague views. Extracted text is indexed in a SQLite file in the local state directory. New and changed files can be searched within about 10 minutes. Deleting that index rebuilds it automatically. |
 
 `ONESTEAD_TOKENS` replaces `tokens.json`. `ONESTEAD_USAGE_LOG` replaces the usage log, and an empty value turns the log off. `ONESTEAD_FEISHU_DIR` replaces the Feishu directory. `ONESTEAD_SKILL_HOME` overrides the home used by the built-in skill scan. `ONESTEAD_CLOUDFLARED` points at the tunnel binary.
 

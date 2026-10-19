@@ -139,7 +139,46 @@ def check_meta(meta: dict, expected_type: str) -> str | None:
             return tr("agent.543")
     if expected_type == "todo" and meta.get("status", "open") not in ("open", "done", "dropped"):
         return tr("agent.526")
+    if expected_type == "project" and "paths" in meta and project_path_list(meta.get("paths")) is None:
+        return tr("here.paths_invalid")
     return None
+
+
+# 盘符、UNC、POSIX 根都算绝对路径。相对路径会跟着进程目录变，不能拿来认项目。
+_ABSOLUTE_DIR = re.compile(r"^(?:[A-Za-z]:[\\/]|\\\\[^\\/]+\\[^\\/]+|//[^/]+/[^/]+|/)")
+
+
+def _is_absolute_dir(text: str) -> bool:
+    return bool(text) and not any(ch in text for ch in "\r\n\x00") and _ABSOLUTE_DIR.match(text) is not None
+
+
+def project_path_list(value) -> list[str] | None:
+    """合规时返回去掉首尾空白的绝对路径；缺省、空列表或不合法都返回 None。"""
+    if not isinstance(value, list) or not value:
+        return None
+    items = []
+    for item in value:
+        if not isinstance(item, str):
+            return None
+        text = item.strip()
+        if not _is_absolute_dir(text):
+            return None
+        items.append(text)
+    return items
+
+
+def clean_project_paths(value) -> list[str] | None:
+    """写入用。空白表示不记；给出了却不合规则拒绝。"""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = [line.strip() for line in value.replace("\r\n", "\n").split("\n") if line.strip()]
+        if not value:
+            return None
+    items = project_path_list(value)
+    if not items:
+        raise BaseError(tr("here.paths_invalid"))
+    return items
 
 
 def read_doc(root: Path, path: Path, expected_type: str) -> Doc:

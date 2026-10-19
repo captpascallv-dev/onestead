@@ -10,6 +10,7 @@ from .i18n import label, text as tr
 from . import config
 
 import datetime as dt
+import os
 import re
 from contextlib import contextmanager
 from pathlib import Path
@@ -19,14 +20,15 @@ from .apps import AppMixin
 from .handover import _status_entries
 from .home import HomeMixin
 from .manage import ID_RE, MAX_BODY, ManageMixin
-from .projectbody import SUMMARY_SECTIONS, _apply_summary_sections, _clean_summary_sections
+from .projectbody import (SUMMARY_SECTIONS, _apply_summary_sections, _clean_summary_sections,
+                          _parse_sections, _section_name)
 from .redact import documents, safe_text
 from .skills import SkillMixin
 from .sites import SiteMixin
 from .todos import TodoMixin
 from .workspace import TokenMixin
-from .store import (LEVEL_NAMES, LEVELS, BaseError, Doc, StorageError, Store, Viewer, make_viewer,
-                    member_cards, member_keys, now_taipei, owner_name_at)
+from .store import (LEVEL_NAMES, LEVELS, BaseError, Doc, StorageError, Store, Viewer, clean_project_paths,
+                    make_viewer, member_cards, member_keys, now_taipei, owner_name_at, project_path_list)
 from .textutil import (MAX_TEXT, SECRET_PATTERNS, _ago, _as_date, _cell, _check_signature,  # noqa: F401
                        _check_text, _dump_front, _strip_title, soften_headings)
 
@@ -175,8 +177,10 @@ class CompanyBase(TodoMixin, AppMixin, SkillMixin, ManageMixin, HomeMixin, Token
 
     # ---------- 读 ----------
 
-    def company(self) -> str:
+    def company(self, cwd: str | None = None) -> str:
         viewer, docs, visible = self._ctx()
+        # 远程不认目录，也不把本机路径写进这段。没给 cwd 时用本进程的当前目录。
+        located = None if viewer.remote else self._project_at(visible, cwd)
         out = [tr("agent.083", v0=config.display_name()), "", self._identity_line(viewer), ""]
         if self._shared_line(viewer):
             out[-1:-1] = [self._shared_line(viewer)]
@@ -211,7 +215,49 @@ class CompanyBase(TodoMixin, AppMixin, SkillMixin, ManageMixin, HomeMixin, Token
         else:
             out += [tr("agent.127"),
                     tr("agent.128")]
-        return "\n".join(out).strip() + "\n"
+        body = "\n".join(out).strip() + "\n"
+        if located is None:
+            return body
+        return self._located_block(located, visible).rstrip("\n") + "\n\n" + body
+
+    def _project_at(self, visible: list[Doc], cwd: str | None) -> Doc | None:
+        current = os.getcwd() if cwd is None else cwd
+        if not isinstance(current, str) or not current.strip():
+            return None
+        here = _normalize_dir(current)
+        best: tuple[tuple[int, str], Doc] | None = None
+        for doc in visible:
+            if doc.kind != "project" or "paths" not in doc.meta:
+                continue
+            items = project_path_list(doc.meta.get("paths"))
+            if not items:
+                continue
+            for item in items:
+                norm = _normalize_dir(item)
+                if not _dir_contains(here, norm):
+                    continue
+                # 同样深（两条路径规整后相同）时取 id 较小的项目，结果稳定。
+                rank = (-len(norm), doc.id)
+                if best is None or rank < best[0]:
+                    best = (rank, doc)
+        return None if best is None else best[1]
+
+    def _located_block(self, doc: Doc, visible: list[Doc]) -> str:
+        meta = doc.meta
+        lines = [
+            tr("here.located", title=doc.title, id=doc.id),
+            tr("here.located_state", state=meta.get("state") or tr("agent.120")),
+            tr("here.located_goal", goal=meta.get("goal") or ""),
+            tr("here.located_roles", roles=self._roles_text(meta)),
+        ]
+        nxt = _clip(_section_text(doc.body, "下一步"))
+        if nxt:
+            lines.append(tr("here.located_next", text=nxt))
+        status = self._find_kind(visible, "project-status", doc)
+        for date, first in _recent_progress(status.body if status else ""):
+            lines.append(tr("here.located_progress", date=date, line=first))
+        lines.append(tr("here.located_detail", id=doc.id))
+        return "\n".join(lines)
 
     def whoami(self) -> str:
         viewer, docs, visible = self._ctx()
@@ -265,7 +311,12 @@ class CompanyBase(TodoMixin, AppMixin, SkillMixin, ManageMixin, HomeMixin, Token
             out.append(tr("agent.130", v0=self.owner_name))
         else:
             out.append(tr("agent.067"))
-        out += ["", _strip_title(doc.body)]
+        body = _strip_title(doc.body)
+        if not viewer.remote and "paths" in meta:
+            items = project_path_list(meta.get("paths"))
+            if items:
+                body = _with_local_dirs(body, items)
+        out += ["", body]
         status = self._find_kind(visible, "project-status", doc)
         if status:
             entries = _status_entries(status.body)
@@ -456,7 +507,7 @@ class CompanyBase(TodoMixin, AppMixin, SkillMixin, ManageMixin, HomeMixin, Token
 
     def create_project(self, project_id: str, title: str, goal: str, state: str = "构想中",
                        body: str | None = None, sensitivity: str = "internal",
-                       signed_as: str | None = None) -> str:
+                       paths: list[str] | None = None, signed_as: str | None = None) -> str:
         """新建项目，只写 projects/<id>/project.md。主人和全读能写的伙伴（本机或远程）都能调。"""
         signed_as = self._sign(signed_as)
         with self._write():
@@ -482,9 +533,15 @@ class CompanyBase(TodoMixin, AppMixin, SkillMixin, ManageMixin, HomeMixin, Token
                 raise BaseError(tr("agent.142"))
             text = PROJECT_BODY if body is None or not body.strip() else _check_text(
                 tr("agent.143"), body, required=False, limit=MAX_BODY)
+            cleaned_paths = clean_project_paths(paths) if paths is not None else None
             today = self._today()
             meta = {"id": project_id, "type": "project", "title": title, "state": state, "goal": goal,
-                    "roles": [], "summary_as_of": today, "sensitivity": sensitivity, "updated": today}
+                    "roles": []}
+            if cleaned_paths:
+                meta["paths"] = cleaned_paths
+            meta["summary_as_of"] = today
+            meta["sensitivity"] = sensitivity
+            meta["updated"] = today
             if sensitivity == "restricted":
                 meta["visible_to"] = []
             rel = f"projects/{project_id}/project.md"
@@ -642,6 +699,69 @@ class CompanyBase(TodoMixin, AppMixin, SkillMixin, ManageMixin, HomeMixin, Token
                 self.root, {project.rel: project_content, status_rel: status_content},
                 f"交接：{project.id} 的{role} → {who}", "handover_role", viewer.key, signed_as)
         return tr("agent.065", v0=role, v1=who, v2=commit)
+
+
+def _normalize_dir(path: str) -> str:
+    """绝对化并去掉末尾分隔符。Windows 上不分大小写，斜杠看成一样。"""
+    text = path.strip()
+    if os.name == "nt":
+        text = text.replace("/", "\\")
+    norm = os.path.normcase(os.path.abspath(text))
+    if os.name == "nt":
+        drive, tail = os.path.splitdrive(norm)
+        tail = tail.rstrip("\\")
+        return drive + ("\\" if not tail else tail)
+    return norm if norm == "/" else norm.rstrip("/")
+
+
+def _dir_contains(child: str, parent: str) -> bool:
+    if child == parent:
+        return True
+    sep = "\\" if os.name == "nt" else "/"
+    if parent.endswith(sep):
+        return child.startswith(parent)
+    return child.startswith(parent + sep)
+
+
+def _section_text(body: str, name: str) -> str:
+    _, sections = _parse_sections(body.replace("\r\n", "\n"))
+    found = next((section for section in sections if section["name"] == name), None)
+    return (found["content"] if found else "").strip()
+
+
+def _clip(text: str, limit: int = 800) -> str:
+    if len(text) <= limit:
+        return text
+    return text[:limit].rstrip() + "…"
+
+
+def _join_paths(paths: list[str]) -> str:
+    sep = "、" if config.lang() == "zh" else ", "
+    return sep.join(f"`{item}`" for item in paths)
+
+
+def _with_local_dirs(body: str, paths: list[str]) -> str:
+    line = tr("here.local_dirs_line", paths=_join_paths(paths))
+    text = body.replace("\r\n", "\n")
+    matches = list(re.finditer(r"(?m)^## .+$", text))
+    for index, matched in enumerate(matches):
+        if _section_name(matched.group(0)) != "入口":
+            continue
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        section = text[matched.end():end].rstrip("\n")
+        return text[:matched.end()] + section + "\n\n" + line + "\n" + text[end:]
+    return text.rstrip("\n") + "\n\n" + line + "\n"
+
+
+def _recent_progress(body: str, limit: int = 2) -> list[tuple[str, str]]:
+    found = []
+    for entry in _status_entries(body or "")[-limit:]:
+        head, _, rest = entry.partition("\n")
+        matched = _STATUS_DATE.match(head)
+        date = matched.group(1) if matched else ""
+        first = next((line.strip() for line in rest.splitlines() if line.strip()), "")
+        found.append((date, first))
+    return found
 
 
 def remote_message(e: BaseError, root: str | Path) -> str:

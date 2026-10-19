@@ -413,7 +413,7 @@ TEXT.update({
     'agent.366': ('已把原来的配置改名为 {v0}，并写入新配置：{v1}', 'Renamed the previous config to {v0} and wrote a new config: {v1}'),
     'agent.367': ('找不到 {v0} 模板 {v1}。', 'Template {v1} for language {v0} was not found.'),
     'agent.368': ('# onestead init 写入。环境变量优先于这一份。', '# Written by onestead init. Environment variables take precedence.'),
-    'agent.369': ('{{name}}（产品 Onestead，简称 OS）：{{owner_name}} 公司的事实（手册、项目、成员、决定、资产）以这里为准。\n第一次用先调用 company()，它会告诉你有哪些项目、谁在做、协作规矩去哪看。\n公司事实只经底座读，不要直接翻数据仓库的文件。\n写进展用 update_project_status，现状、下一步、分工、入口变了用 update_project_summary 改正文，记决定用 record_decision，换担任者用 handover_role，\n你的待办（agent 是它所属的人的）用 list_todos / add_todos / update_todo，做好的应用用 register_app 登记到应用广场，各家的 Skill 用 list_skills / get_skill 看；\n同一身份被多个对话共用（如 codex、claude、assistant），写入时请用 signed_as 署上你的名字。\n每做完一段工作（一次交付、一个阶段、当天收工），自己用 update_project_status 记一条进展：做了什么、结果在哪、下一步，\n不用等 {{owner_name}} 提醒；定下来的事用 record_decision 记。\n绝不写入密钥、token、密码、cookie 的值，只写“凭据在哪、叫什么”。', "{{name}} (Onestead, abbreviated OS) is the source of truth for {{owner_name}}'s company facts: handbooks, projects, members, decisions, and assets.\nOn first use, call company() for projects, role holders, and links to collaboration rules.\nRead company facts through Onestead, not directly from data repository files.\nUse update_project_status for progress; update_project_summary when current status, next steps, responsibilities, or entry points change; record_decision for decisions; handover_role for role changes.\nUse list_todos / add_todos / update_todo for your to-dos (an Agent uses its owner's); register completed apps with register_app; browse Skills with list_skills / get_skill.\nIf several conversations share an identity (e.g. codex, claude, assistant), sign writes with your name using signed_as.\nAt the end of each delivery, stage, or workday, record progress yourself with update_project_status: what you did, where the results are, and what comes next. Do not wait for {{owner_name}} to remind you. Record settled decisions with record_decision.\nNever store secret, token, password, or cookie values. Record only where credentials are kept and what they are called."),
+    'agent.369': ('{{name}}（产品 Onestead，简称 OS）：{{owner_name}} 公司的事实（手册、项目、成员、决定、资产）以这里为准。\n第一次用先调用 company()，它会告诉你有哪些项目、谁在做、协作规矩去哪看。\n在项目目录里开工时，company() 会直接带出这个项目的现状。\n公司事实只经底座读，不要直接翻数据仓库的文件。\n写进展用 update_project_status，现状、下一步、分工、入口变了用 update_project_summary 改正文，记决定用 record_decision，换担任者用 handover_role，\n你的待办（agent 是它所属的人的）用 list_todos / add_todos / update_todo，做好的应用用 register_app 登记到应用广场，各家的 Skill 用 list_skills / get_skill 看；\n同一身份被多个对话共用（如 codex、claude、assistant），写入时请用 signed_as 署上你的名字。\n每做完一段工作（一次交付、一个阶段、当天收工），自己用 update_project_status 记一条进展：做了什么、结果在哪、下一步，\n不用等 {{owner_name}} 提醒；定下来的事用 record_decision 记。\n绝不写入密钥、token、密码、cookie 的值，只写“凭据在哪、叫什么”。', "{{name}} (Onestead, abbreviated OS) is the source of truth for {{owner_name}}'s company facts: handbooks, projects, members, decisions, and assets.\nOn first use, call company() for projects, role holders, and links to collaboration rules.\nWhen you start in a project directory, company() includes that project's current status.\nRead company facts through Onestead, not directly from data repository files.\nUse update_project_status for progress; update_project_summary when current status, next steps, responsibilities, or entry points change; record_decision for decisions; handover_role for role changes.\nUse list_todos / add_todos / update_todo for your to-dos (an Agent uses its owner's); register completed apps with register_app; browse Skills with list_skills / get_skill.\nIf several conversations share an identity (e.g. codex, claude, assistant), sign writes with your name using signed_as.\nAt the end of each delivery, stage, or workday, record progress yourself with update_project_status: what you did, where the results are, and what comes next. Do not wait for {{owner_name}} to remind you. Record settled decisions with record_decision.\nNever store secret, token, password, or cookie values. Record only where credentials are kept and what they are called."),
     'agent.370': ('{v0} 或项目负责人让你开新项目时用；建完用 handover_role 把担任者登记上。', 'Use when {v0} or the project Lead asks you to create a project; register role holders with handover_role afterwards.'),
     'agent.371': ('换某个角色的担任者。普通角色直接生效；关键角色先记一条接任申请，带上 {v0} 的批准再调一次才生效。', 'Change a role holder. Ordinary roles take effect immediately; key roles first create a handover request. Call again with approval from {v0} for it to take effect.'),
     'agent.372': ('做完一个应用后登记上架，{v0} 就能在应用广场找到并打开它。', 'Register a completed app so {v0} can find and open it in Apps.'),
@@ -803,6 +803,21 @@ TEXT.update({"label." + zh: (zh, en) for zh, en in (
     ("只看这些状态，空表示全部，例如 [进行中, 维护中]", "Filter by unchanged stored status values; empty means all. Use values returned by get_project."),
     ("看最近几天", "Number of recent days"), ("显示几条", "Number of entries"),
 )})
+TEXT.update({
+    "here.paths_invalid": ("paths 要是非空的绝对路径列表。", "paths must be a nonempty list of absolute paths."),
+    "here.cwd_help": ("用这个目录认项目；不填则用当前目录", "Match a project from this directory; omit to use the current directory"),
+    "here.path_help": ("本机目录的绝对路径，可重复", "Absolute local directory; repeat to add more"),
+    "here.mcp_cwd": ("当前工作目录。不填时，本机服务用自己进程的当前目录。远程接入不按目录匹配。", "Working directory. When omitted, a local server uses its process working directory. Remote access does not match a project by directory."),
+    "here.mcp_paths": ("本机目录的绝对路径，可多个。不填就不记。", "Absolute local directories for this project. Omit to leave them unset."),
+    "here.located": ("你现在在「{title}」（`{id}`）的目录里。", "You are in the directory of \"{title}\" (`{id}`)."),
+    "here.located_state": ("状态：{state}", "Status: {state}"),
+    "here.located_goal": ("一句话目标：{goal}", "Goal: {goal}"),
+    "here.located_roles": ("担任者：{roles}", "Role holders: {roles}"),
+    "here.located_next": ("下一步：{text}", "Next steps: {text}"),
+    "here.located_progress": ("{date} {line}", "{date} {line}"),
+    "here.located_detail": ("详情 `get_project('{id}')`。", "Details: `get_project('{id}')`."),
+    "here.local_dirs_line": ("本机目录：{paths}", "Local directories: {paths}"),
+})
 
 
 def label(value: str) -> str:
@@ -812,3 +827,35 @@ def label(value: str) -> str:
 
 def locale() -> str:
     return "zh-CN" if config.lang() == "zh" else "en"
+
+
+TEXT.update({
+    "connect.hint": ("接本机 agent：`onestead connect`", "Connect local agents: `onestead connect`"),
+    "connect.help": ("把本机已安装的客户端接到 Onestead（默认只预览）", "Connect installed local clients to Onestead (preview unless --apply)"),
+    "connect.help_apply": ("写入配置；省略时只预览，不改文件", "Write the configuration; omit to preview without changing files"),
+    "connect.help_client": ("只处理这一家，可重复：claude-code、codex、cursor", "Handle only this client; repeat to select more than one of claude-code, codex, and cursor"),
+    "connect.help_agent": ("指定身份键；只能搭配单独一个 --client", "Identity key; allowed only with exactly one --client"),
+    "connect.preview_banner": ("预览，未写入任何文件。", "Preview only. No file was written."),
+    "connect.none": ("没有发现已安装的受支持客户端。", "No supported client is installed."),
+    "connect.client": ("客户端：{client}", "Client: {client}"),
+    "connect.file": ("文件：{path}", "File: {path}"),
+    "connect.identity": ("身份：{agent}", "Identity: {agent}"),
+    "connect.replace_old": ("旧项 company-base 会被替换。", "The old company-base entry will be replaced."),
+    "connect.create": ("文件还不存在，将会新建。", "The file does not exist yet and will be created."),
+    "connect.will_write": ("将改成：", "Will write:"),
+    "connect.current": ("已是最新。", "Already up to date."),
+    "connect.wrote": ("已写入。", "Wrote the file."),
+    "connect.backup": ("备份：{path}", "Backup: {path}"),
+    "connect.skipped": ("已跳过：{reason}", "Skipped: {reason}"),
+    "connect.reason_json": ("JSON 解析失败，原文件未改。", "JSON could not be parsed, so the original file was not changed."),
+    "connect.reason_shape": ("配置结构无法识别，原文件未改。", "The configuration structure was not recognized, so the original file was not changed."),
+    "connect.reason_toml": ("TOML 解析失败，原文件未改。", "TOML could not be parsed, so the original file was not changed."),
+    "connect.reason_toml_unsafe": ("TOML 结构无法安全修改，原文件未改。", "The TOML structure cannot be edited safely, so the original file was not changed."),
+    "connect.reason_encoding": ("文件不是 UTF-8，原文件未改。", "The file is not UTF-8, so the original file was not changed."),
+    "connect.reason_not_file": ("目标路径不是文件，未改动。", "The target path is not a file, so nothing was changed."),
+    "connect.reason_read": ("无法读取文件，原文件未改。", "The file could not be read, so the original file was not changed."),
+    "connect.reason_write": ("写入失败，原文件未改。", "Writing failed, so the original file was not changed."),
+    "connect.member_missing": ("数据仓库里没有成员 {agent}。", "No member {agent} in the data repository."),
+    "connect.member_unknown": ("没能读取数据仓库，未核对该身份是不是成员。", "Could not read the data repository, so the identity was not checked against members."),
+    "connect.agent_key_client": ("--agent-key 只能和单独一个 --client 一起用。", "--agent-key requires exactly one --client."),
+})

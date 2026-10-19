@@ -15,7 +15,7 @@ import hashlib
 import re
 
 from . import feishu, gitops, skillscan, skills, tokens
-from .store import LEVELS, BaseError, Doc, check_meta, is_archived, member_keys
+from .store import LEVELS, BaseError, Doc, check_meta, clean_project_paths, is_archived, member_keys
 from .handover import pending_handovers
 from .textutil import _as_date, _check_text, _dump_front, _strip_title
 
@@ -24,6 +24,12 @@ STATES = ("进行中", "维护中", "构想中", "暂停", "已结束", "历史"
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,40}$")
 MAX_BODY = 60000
 REJECT_ENTRY = "不批接任：「{role}」由「{old}」换成「{who}」，{owner_name} 没有批准。"
+
+
+def _path_lines(value) -> str:
+    if not isinstance(value, list):
+        return ""
+    return "\n".join(item.strip() for item in value if isinstance(item, str) and item.strip())
 
 
 def version_of(raw: str) -> str:
@@ -39,6 +45,7 @@ def _fields(d: Doc, members: dict[str, Doc], projects: list[Doc], assets: list[D
         out += [{"key": "state", "label": "状态", "type": "select", "value": now,
                  "options": ([] if now in STATES else [now]) + list(STATES), "labels": {"": "没写状态"}},
                 {"key": "goal", "label": "一句话", "type": "text", "value": m.get("goal") or ""},
+                {"key": "paths", "label": "本机目录", "type": "lines", "value": _path_lines(m.get("paths"))},
                 {"key": "summary_as_of", "label": "现状摘要截至", "type": "date", "value": str(m.get("summary_as_of") or "")}]
     elif d.kind == "person":
         out += [{"key": "role", "label": "角色", "type": "text", "value": m.get("role") or ""},
@@ -187,6 +194,12 @@ class ManageMixin:
                     if changes["summary_as_of"] and when is None:
                         raise BaseError(tr("agent.330"))
                     meta["summary_as_of"] = when
+                if "paths" in changes:
+                    cleaned = clean_project_paths(changes.get("paths"))
+                    if cleaned:
+                        meta["paths"] = cleaned
+                    else:
+                        meta.pop("paths", None)
                 if meta.get("sensitivity") == "restricted":
                     loose = [x.title for x in visible if x.kind == "decision" and x.meta.get("project") == d.id
                              and x.sensitivity != "restricted"]

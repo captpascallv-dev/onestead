@@ -62,6 +62,7 @@ def init_repo(args) -> None:
     print()
     print(connect_prompt(name).rstrip())
     print()
+    print(tr("connect.hint"))
     print(tr("agent.356"))
 
 

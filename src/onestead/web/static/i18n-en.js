@@ -793,5 +793,7 @@ const I18N_EN = {
   "punct.period": ". ",
   "label.agent": "Agent",
   "file.draft": "Home draft",
-  "token.http": "MCP (HTTP): {0}\nAuthorization: Bearer {1}"
+  "token.http": "MCP (HTTP): {0}\nAuthorization: Bearer {1}",
+  "here.local_dirs": "Local directories",
+  "here.local_dirs_hint": "One absolute path per line"
 };

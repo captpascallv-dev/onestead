@@ -84,7 +84,9 @@ It opens the owner's web app in your default browser, normally on `127.0.0.1:876
 
 On **Members**, add an agent with a separate key, for example `codex`, and set **Belongs to** to `alex`. For this local setup, choose **Full access** if it should read all company facts. Set **Can write to Onestead** according to whether you want it to make changes.
 
-Copy that client's connection block printed by `init`, or use the connection instructions on the web. Replace the identity placeholder with `codex`. After connecting, ask the agent to call `company()` and report the projects and collaboration rules it can see.
+Copy that client's connection block printed by `init`, or use the connection instructions on the web. Replace the identity placeholder with `codex`. After connecting, ask the agent to call `company()` and report the projects and collaboration rules it can see. If that client is started inside a directory listed in a project's `paths`, `company()` leads with that project's current status. Remote connections do not match by directory.
+
+`onestead connect` previews the same kind of edit for clients already installed on this computer. `onestead connect --apply` writes it.
 
 The owner key is reserved for the local web app. Each agent needs its own member key.
 
@@ -93,6 +95,15 @@ More detail: [Getting started](docs/getting-started.md). A sample company is in 
 ## Connect your agents
 
 Local clients start `onestead-mcp` over stdio. Set `ONESTEAD_AGENT` to the registered agent's key. Use the executable path printed for your installation so the client starts the correct Python environment.
+
+`onestead connect` lists each installed client, the user-level file it would change, and the `onestead` entry it would write. It does not write anything. `onestead connect --apply` writes those files. Before an existing file is replaced, the command copies `<filename>.onestead-backup-<YYYYMMDD-HHMMSS>` next to it (the time is UTC+8), then replaces the file from a temporary file in the same directory. A file that already matches is left unchanged and is not backed up again.
+
+The command is `onestead-mcp` when that program is in the current Python environment; otherwise it is the current interpreter with `-m onestead.server`. An existing `onestead` or `company-base` entry keeps the identity stored in `ONESTEAD_AGENT` or `COMPANY_BASE_AGENT`. If `company-base` is still present, `--apply` removes it and writes `onestead` instead. The preview says that the old entry will be replaced. `--client claude-code`, `--client codex`, or `--client cursor` limits the command to that client. Repeat the flag to select more than one.
+
+```powershell
+onestead connect
+onestead connect --apply
+```
 
 | Client | Setup |
 | --- | --- |

@@ -84,6 +84,7 @@ Path: `projects/<id>/project.md`.
 | `summary_as_of` | no | Date `YYYY-MM-DD`. Create sets it to today. Updating the `现状` section sets it to today. |
 | `updated` | no | Date the writers set on save. |
 | `authority` | no | A map. The reader uses `label` and `path` in the summary banner. Remote readers are shown the label, not the path. No tool writes this field. |
+| `paths` | no | Absolute directories on the computer that runs Onestead. When present, a nonempty list of nonempty strings. Each item is an absolute path (`C:/shop`, `\\server\share\shop`, or `/shop`). An empty list, a value that is not a list, a blank item, or a relative path marks the file as a problem. A missing field is valid. Local `company()` treats the working directory as this project when it equals one of these paths or is inside it. If several match, the deepest path wins. Comparison ignores a trailing slash; on Windows it also ignores case and treats `/` and `\` as the same. Remote callers do not match by directory and are not shown `paths`. |
 | `visible_to` | when restricted | On create of a restricted project, the tool writes an empty list. |
 
 A role may also have:

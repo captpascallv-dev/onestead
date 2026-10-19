@@ -109,7 +109,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--name", required=True, help=tr("agent.174"))
     s.add_argument("--lang", default="en", choices=("en", "zh"), help=tr("agent.175"))
     s.add_argument("--force-config", action="store_true", help=tr("agent.176"))
-    sub.add_parser("company", parents=[common], help=tr("agent.177"))
+    s = sub.add_parser("connect", parents=[common], help=tr("connect.help"))
+    s.add_argument("--apply", action="store_true", help=tr("connect.help_apply"))
+    s.add_argument("--client", action="append", choices=("claude-code", "codex", "cursor"),
+                   help=tr("connect.help_client"))
+    s.add_argument("--agent-key", help=tr("connect.help_agent"))
+    s = sub.add_parser("company", parents=[common], help=tr("agent.177"))
+    s.add_argument("--cwd", help=tr("here.cwd_help"))
     sub.add_parser("whoami", parents=[common], help=tr("agent.178"))
     sub.add_parser("projects", parents=[common], help=tr("agent.179"))
     s = sub.add_parser("project", parents=[common], help=tr("agent.180"))
@@ -124,6 +130,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--body")
     s.add_argument("--body-file", help=tr("agent.184"))
     s.add_argument("--sensitivity", default="internal", help=tr("agent.185"))
+    s.add_argument("--path", action="append", help=tr("here.path_help"))
     s = sub.add_parser("search", parents=[common], help=tr("agent.186"))
     s.add_argument("query", nargs="+")
     s.add_argument("--limit", type=int, default=20)
@@ -235,6 +242,9 @@ def run(argv: list[str] | None = None) -> int:
             print(str(error), file=sys.stderr)
             return 2
         return 0
+    if args.cmd == "connect":
+        from .connect import run_connect
+        return run_connect(args)
     try:
         root = resolve_data(args)
     except BaseError as error:
@@ -255,12 +265,12 @@ def run(argv: list[str] | None = None) -> int:
     usage.record(agent, args.cmd, "cli")
     try:
         out = {
-            "company": lambda: base.company(),
+            "company": lambda: base.company(args.cwd),
             "whoami": lambda: base.whoami(),
             "projects": lambda: base.list_projects(),
             "project": lambda: base.get_project(args.project_id, args.entries),
             "project-create": lambda: base.create_project(args.project_id, args.title, args.goal, args.state,
-                                                         _text(args, "body"), args.sensitivity, signed),
+                                                         _text(args, "body"), args.sensitivity, args.path, signed),
             "search": lambda: base.search(" ".join(args.query), args.limit),
             "handbook": lambda: base.get_handbook(args.handbook_id),
             "assets": lambda: base.list_assets(),

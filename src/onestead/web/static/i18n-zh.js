@@ -793,5 +793,7 @@ const I18N_ZH = {
   "punct.period": "。",
   "label.agent": "agent",
   "file.draft": "首页草稿",
-  "token.http": "MCP（HTTP）：{0}\nAuthorization: Bearer {1}"
+  "token.http": "MCP（HTTP）：{0}\nAuthorization: Bearer {1}",
+  "here.local_dirs": "本机目录",
+  "here.local_dirs_hint": "一行一个绝对路径"
 };

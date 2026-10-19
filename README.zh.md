@@ -84,7 +84,9 @@ python -m onestead.web
 
 在**成员**页添加 agent，使用独立成员键，例如 `codex`，并把**属于谁**设为 `alex`。本机使用时，如果需要读取全部公司事实，选择**全部（本机伙伴）**；是否允许改动，用**能用底座的写接口**设置。
 
-复制 `init` 打印的对应客户端接入块，或使用网页上的接入说明，把身份占位符换成 `codex`。接好后让 agent 调用 `company()`，说明它能看到哪些项目和协作规则。
+复制 `init` 打印的对应客户端接入块，或使用网页上的接入说明，把身份占位符换成 `codex`。接好后让 agent 调用 `company()`，说明它能看到哪些项目和协作规则。客户端若从项目 `paths` 里的某个目录启动，`company()` 会先带出这个项目的现状。远程接入不按目录匹配。
+
+不想手工粘贴时，先运行 `onestead connect` 预览本机已安装的客户端会改哪些文件，再运行 `onestead connect --apply` 写入。
 
 主人键专供本机网页使用。每个 agent 都需要自己的成员键。
 
@@ -93,6 +95,15 @@ python -m onestead.web
 ## 接各家 agent
 
 本机客户端通过 stdio 启动 `onestead-mcp`，把 `ONESTEAD_AGENT` 设为已登记的 agent 成员键。使用接入说明打印的可执行文件路径，确保客户端启动的是正确的 Python 环境。
+
+`onestead connect` 会列出本机已安装的客户端、要改的用户级配置文件，以及将写入的 `onestead` 项，但不会写任何文件。`onestead connect --apply` 才写入。已有文件会先在同目录复制为 `<文件名>.onestead-backup-<YYYYMMDD-HHMMSS>`（台北时间，UTC+8），再用同目录的临时文件替换原文件。内容已经一致时不写，也不再备份。
+
+当前 Python 环境里有 `onestead-mcp` 就用它，否则用当前解释器加 `-m onestead.server`。原来的 `onestead` 或 `company-base` 项若已有 `ONESTEAD_AGENT` 或 `COMPANY_BASE_AGENT`，沿用那个身份。文件里若还有 `company-base`，`--apply` 会删掉它并写入 `onestead`，预览会说明旧项会被替换。`--client claude-code`、`--client codex` 或 `--client cursor` 只处理指定的一家，这个参数可以重复。
+
+```powershell
+onestead connect
+onestead connect --apply
+```
 
 | 客户端 | 接法 |
 | --- | --- |

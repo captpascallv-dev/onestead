@@ -50,6 +50,13 @@ function fieldInput(f, values) {
     sel.addEventListener("change", () => { values[f.key] = sel.value; });
     return sel;
   }
+  if (f.type === "lines") {
+    const area = h("textarea", { class: "input area", rows: 4, "aria-label": uiLabel(f.label),
+      placeholder: uiText("here.local_dirs_hint") });
+    area.value = values[f.key] ?? "";
+    area.addEventListener("input", () => { values[f.key] = area.value; });
+    return area;
+  }
   if (f.type === "bool") {
     return h("label", { class: "toggle" }, h("input", { type: "checkbox", checked: values[f.key] || null, disabled: f.locked || null,
       onchange: e => { values[f.key] = e.target.checked; } }), uiText("manage.162"));

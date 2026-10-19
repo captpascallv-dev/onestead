@@ -7,13 +7,14 @@ from __future__ import annotations
 
 import ipaddress
 import re
+from dataclasses import replace
 from urllib.parse import urlsplit
 
 import markdown as md
 import nh3
 
 from .store import Doc, Viewer
-from .textutil import SECRET_CONTENT, SECRET_PATTERNS
+from .textutil import SECRET_CONTENT, SECRET_PATTERNS, _dump_front
 
 # Markdown 的括号、反引号和中文标点是路径边界，不吃掉链接及代码块的结构。
 PATH_START = (r"(?:file:/+|(?<![A-Za-z0-9])[A-Z]:[\\/]|(?<![\w.\\])\\\\(?=[^\\/\s]+[\\/])|"
@@ -101,7 +102,22 @@ def html(text) -> str:
     return to_html(safe_text(text), url_filter=safe_url)
 
 
+def _without_local_paths(doc: Doc) -> Doc:
+    """投影里不带 paths。进展文件的正文不含这个字段，只去掉复制来的标记。"""
+    if "paths" not in doc.meta:
+        return doc
+    meta = {key: value for key, value in doc.meta.items() if key != "paths"}
+    raw = _dump_front(meta) + doc.body if doc.kind == "project" else doc.raw
+    return replace(doc, meta=meta, raw=raw)
+
+
 def documents(viewer: Viewer, docs: list[Doc]) -> list[Doc]:
     """同事能读的文件：不要原始成员或 Skill，坏标记和下架应用也不进入计数。"""
-    return [d for d in viewer.visible(docs) if not d.problem and d.kind not in ("person", "skill")
-            and (d.kind != "app" or d.meta.get("listed", True) is not False)]
+    out = []
+    for doc in viewer.visible(docs):
+        if doc.problem or doc.kind in ("person", "skill"):
+            continue
+        if doc.kind == "app" and doc.meta.get("listed", True) is False:
+            continue
+        out.append(_without_local_paths(doc))
+    return out

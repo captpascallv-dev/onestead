@@ -729,6 +729,8 @@ TEXT["mcp.instructions"] = tuple(
 TEXT.update({
     "folder.page": ("--- 第 {n} 页 ---", "--- Slide {n} ---"),
     "folder.sheet": ("--- 工作表 {name} ---", "--- Sheet {name} ---"),
+    "folder.zip_member": ("=== 压缩包里的 {name} ===", "=== {name} (inside the archive) ==="),
+    "folder.zip_list": ("压缩包里共 {n} 个文件：{names}", "The archive holds {n} files: {names}"),
     "folder.truncated": ("（正文太长，只给了前 {n} 字）", "(Text truncated to the first {n} characters.)"),
     "folder.no_text": ("（这份文件里抽不出文字，可能是扫描件、图片或加密文件）", "(No text could be extracted. It may be a scan, an image, or an encrypted file.)"),
     "folder.type": ("共享文件夹", "Shared folder"),

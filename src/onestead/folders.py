@@ -3,18 +3,21 @@
 - 只认配置 shared_folders 里的文件夹，只给 readers 里的身份看；不进网页、同事视图和公开页面。
 - 只读白名单类型的文件；跳过符号链接和目录联接、浏览器登录资料、带凭据字样的文件和目录。
 - 读文件时从文件夹根逐级核对，路径里不许有 ..、盘符或链接，解析后的真实路径也必须还在文件夹里。
-- PDF、Word、PPT、Excel 抽出文字；正文出去前仍走 safe_text 遮掉凭据和本机路径。
+- PDF、Word、PPT、Excel（含老式 .xls）抽出文字；.zip 里能读的成员逐个抽出；正文出去前仍走 safe_text 遮掉凭据和本机路径。
 - 抽出的文字写在状态目录的 SQLite 索引里。原文件仍是唯一真相；索引删了或坏了按原文件重建。
 """
 
 from __future__ import annotations
 
 import html
+import io
 import logging
 import os
 import re
 import sqlite3
 import threading
+import time
+import zipfile
 from fnmatch import fnmatch
 from pathlib import Path
 
@@ -25,9 +28,11 @@ log = logging.getLogger(__name__)
 logging.getLogger("pypdf").setLevel(logging.ERROR)  # 字体解析的提示每页一条，会刷满日志
 
 TEXT_TYPES = {".md", ".txt", ".csv", ".json", ".html", ".htm"}
-DOC_TYPES = {".pdf", ".docx", ".pptx", ".xlsx"}
+DOC_TYPES = {".pdf", ".docx", ".pptx", ".xlsx", ".xls", ".zip"}
 MAX_TEXT_BYTES = 5 * 1024 * 1024
 MAX_DOC_BYTES = 50 * 1024 * 1024
+ZIP_MAX_MEMBERS = 500  # 一个压缩包最多看这么多个成员
+ZIP_MAX_TOTAL = 200 * 1024 * 1024  # 一个压缩包解压出来合计最多读这么多字节，防压缩炸弹
 MAX_CHARS = 200_000  # 一份正文最多给这么多字，超出的截断并注明
 SKIP_DIRS = {".git", ".svn", ".hg", "node_modules", "__pycache__", ".venv", "venv", "site-packages", ".idea", ".vscode"}
 # 名字里带这些字样的文件或目录一律不碰（凭据、登录态）
@@ -37,7 +42,8 @@ SENSITIVE = re.compile(r"(?i)secret|token|credential|cookie|password|passwd|priv
 BROWSER_MARKERS = {"Local State", "Cookies", "Login Data", "Web Data", "Preferences", "Secure Preferences"}
 
 INDEX_FILENAME = "shared-folders.sqlite"
-SYNC_INTERVAL = 10 * 60  # 新增和修改的文件，最迟这一轮后台同步后能搜到
+SYNC_INTERVAL = 10 * 60  # 后台每隔这么久同步一次
+FRESH_SECONDS = 60  # 搜索时离上次同步超过这么久，先补一次增量同步，刚写进去的文件马上能搜到
 
 _tls = threading.local()
 _init_lock = threading.Lock()
@@ -45,6 +51,7 @@ _sync_lock = threading.Lock()
 _warm_lock = threading.Lock()
 _warm_stop = threading.Event()
 _warm_thread: threading.Thread | None = None
+_last_synced = 0.0  # 上次同步做完的时刻（time.monotonic）
 
 
 def folders_for(viewer_key: str | None) -> list[dict]:
@@ -149,8 +156,12 @@ def resolve(folder: dict, rel: str) -> Path | None:
     return here
 
 
-def _read_text(path: Path) -> str:
-    raw = path.read_bytes()
+def _src(src):
+    """抽取函数既收文件路径，也收压缩包里读出来的内存文件。"""
+    return str(src) if isinstance(src, Path) else src
+
+
+def _decode(raw: bytes) -> str:
     for enc in ("utf-8-sig", "gb18030"):
         try:
             return raw.decode(enc)
@@ -165,17 +176,17 @@ def _html_text(text: str) -> str:
     return re.sub(r"[ \t\r\f\v]+", " ", html.unescape(text))
 
 
-def _pdf(path: Path) -> str:
+def _pdf(src) -> str:
     from pypdf import PdfReader
 
-    reader = PdfReader(str(path))
+    reader = PdfReader(_src(src))
     return "\n\n".join((page.extract_text() or "") for page in reader.pages)
 
 
-def _docx(path: Path) -> str:
+def _docx(src) -> str:
     import docx
 
-    d = docx.Document(str(path))
+    d = docx.Document(_src(src))
     out = [p.text for p in d.paragraphs]
     for table in d.tables:
         for row in table.rows:
@@ -183,11 +194,11 @@ def _docx(path: Path) -> str:
     return "\n".join(out)
 
 
-def _pptx(path: Path) -> str:
+def _pptx(src) -> str:
     from pptx import Presentation
 
     out = []
-    for n, slide in enumerate(Presentation(str(path)).slides, 1):
+    for n, slide in enumerate(Presentation(_src(src)).slides, 1):
         out.append(tr("folder.page", n=n))
         for shape in slide.shapes:
             if getattr(shape, "has_text_frame", False) and shape.has_text_frame:
@@ -200,31 +211,111 @@ def _pptx(path: Path) -> str:
     return "\n".join(out)
 
 
-def _xlsx(path: Path) -> str:
+def _cell(v) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))  # 老式 Excel 的数字都是小数，12.0 写成 12
+    return str(v)
+
+
+def _sheets_text(sheets) -> str:
+    """sheets：(表名, 行) 的序列。每行的格子用 Tab 隔开，字数够了就停。"""
+    out, total = [], 0
+    for name, rows in sheets:
+        out.append(tr("folder.sheet", name=name))
+        for row in rows:
+            line = "\t".join(_cell(v) for v in row).rstrip()
+            if line:
+                out.append(line)
+                total += len(line)
+            if total > MAX_CHARS:
+                return "\n".join(out)
+    return "\n".join(out)
+
+
+def _xlsx(src) -> str:
     import warnings
 
     from openpyxl import load_workbook
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")  # 缺默认样式之类的提示，和抽文字无关
-        wb = load_workbook(str(path), read_only=True, data_only=True)
-    out, total = [], 0
+        wb = load_workbook(_src(src), read_only=True, data_only=True)
     try:
-        for ws in wb.worksheets:
-            out.append(tr("folder.sheet", name=ws.title))
-            for row in ws.iter_rows(values_only=True):
-                line = "\t".join("" if v is None else str(v) for v in row).rstrip()
-                if line:
-                    out.append(line)
-                    total += len(line)
-                if total > MAX_CHARS:
-                    return "\n".join(out)
+        return _sheets_text((ws.title, ws.iter_rows(values_only=True)) for ws in wb.worksheets)
     finally:
         wb.close()
+
+
+def _xls(src) -> str:
+    import xlrd
+
+    quiet = io.StringIO()  # xlrd 默认把提示打到标准输出，本机 MCP 靠标准输出通信，不能让它写
+    if isinstance(src, Path):
+        book = xlrd.open_workbook(str(src), logfile=quiet, on_demand=True)
+    else:
+        book = xlrd.open_workbook(file_contents=src.getvalue(), logfile=quiet, on_demand=True)
+    try:
+        return _sheets_text((ws.name, (ws.row_values(r) for r in range(ws.nrows))) for ws in book.sheets())
+    finally:
+        book.release_resources()
+
+
+def _zip_name(info: zipfile.ZipInfo) -> str:
+    """没打 UTF-8 标记的成员名，Python 按 cp437 解；国内压缩软件写的多半其实是 GBK。"""
+    if info.flag_bits & 0x800:
+        return info.filename
+    try:
+        return info.filename.encode("cp437").decode("gb18030")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return info.filename
+
+
+def _zip(src) -> str:
+    """压缩包里能读的文本、表格和文档逐个抽出来；成员名同样过敏感字样和类型、大小的筛选，不进套娃压缩包。"""
+    out, total, budget = [], 0, ZIP_MAX_TOTAL
+    with zipfile.ZipFile(_src(src)) as zf:
+        members = [(info, _zip_name(info)) for info in zf.infolist()[:ZIP_MAX_MEMBERS] if not info.is_dir()]
+        names = [name for _, name in members if all(_name_ok(p) for p in name.replace("\\", "/").split("/") if p)]
+        # 先列清单：包很大、后面的成员被截掉时，读的人也知道里面还有什么
+        shown = ("、" if config.lang() == "zh" else ", ").join(names[:50]) + ("…" if len(names) > 50 else "")
+        out.append(tr("folder.zip_list", n=len(names), names=shown))
+        for info, name in members:
+            if info.flag_bits & 0x1:  # 加密的成员跳过
+                continue
+            parts = [p for p in name.replace("\\", "/").split("/") if p not in ("", ".", "..")]
+            ext = os.path.splitext(name)[1].lower()
+            if (not parts or ext == ".zip" or info.file_size > budget
+                    or any(p in SKIP_DIRS or not _name_ok(p) for p in parts)
+                    or not _file_ok(parts[-1], info.file_size)):
+                continue
+            try:
+                with zf.open(info) as fh:
+                    data = fh.read(info.file_size + 1)
+                if len(data) > info.file_size:  # 头里报的大小不实，不信这个成员
+                    continue
+                budget -= len(data)
+                text = _bytes_text(ext, data)
+            except Exception:  # 一个坏成员不拖累整个包
+                log.info("压缩包里这个成员抽不出文字：%s", name, exc_info=True)
+                continue
+            if text.strip():
+                out += [tr("folder.zip_member", name="/".join(parts)), text]
+                total += len(text)
+            if total > MAX_CHARS:
+                break
     return "\n".join(out)
 
 
-EXTRACT = {".pdf": _pdf, ".docx": _docx, ".pptx": _pptx, ".xlsx": _xlsx}
+EXTRACT = {".pdf": _pdf, ".docx": _docx, ".pptx": _pptx, ".xlsx": _xlsx, ".xls": _xls, ".zip": _zip}
+
+
+def _bytes_text(ext: str, data: bytes) -> str:
+    if ext in EXTRACT:
+        return EXTRACT[ext](io.BytesIO(data))
+    text = _decode(data)
+    return _html_text(text) if ext in (".html", ".htm") else text
 
 
 def text_of(path: Path, st: os.stat_result | None = None) -> str:
@@ -236,12 +327,7 @@ def text_of(path: Path, st: os.stat_result | None = None) -> str:
     del st
     ext = path.suffix.lower()
     try:
-        if ext in EXTRACT:
-            text = EXTRACT[ext](path)
-        else:
-            text = _read_text(path)
-            if ext in (".html", ".htm"):
-                text = _html_text(text)
+        text = EXTRACT[ext](path) if ext in EXTRACT else _bytes_text(ext, path.read_bytes())
     except ImportError:
         text = ""
         log.warning("缺少抽取 %s 文字的库，装 onestead[docs] 后才能读", ext)
@@ -480,6 +566,8 @@ def _sync_body(viewer_keys: set[str] | None) -> None:
         deleted += removed
     deleted += _drop_removed_folders(conn, [folder["key"] for folder in configured])
     _restrict(_db_path())
+    global _last_synced
+    _last_synced = time.monotonic()
     if extracted or deleted:
         log.info("共享文件夹索引已同步，更新 %s 个，删除 %s 个", extracted, deleted)
 
@@ -605,8 +693,10 @@ def _rebuild_and_search(viewer_key: str | None, terms: list[str], limit: int) ->
 def search(viewer_key: str | None, terms: list[str], limit: int = 50) -> list[dict]:
     """所有词都要出现在路径或正文里，不分大小写；路径命中的排前面。"""
     thread = _warm_thread
-    if thread is None or not thread.is_alive():
-        _sync_if_idle()  # 没有后台同步（命令行、测试）才在搜索前补一次；服务里交给后台，搜索不等遍历
+    if thread is None or not thread.is_alive() or time.monotonic() - _last_synced > FRESH_SECONDS:
+        # 没有后台同步（命令行、测试），或离上次同步超过一分钟：先补一次增量同步，刚写进去的文件也能搜到。
+        # 后台正在同步时拿不到锁，直接用现有索引，不等。
+        _sync_if_idle()
     try:
         return _search(viewer_key, terms, limit)
     except sqlite3.DatabaseError as exc:

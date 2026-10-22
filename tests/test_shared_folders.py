@@ -418,3 +418,83 @@ def test_index_mode_is_private_on_posix(tmp_path, monkeypatch):
     folders._restrict(path)
     assert any(str(target).endswith("shared-folders.sqlite") and mode == 0o600 for target, mode in modes)
     assert any(str(target).endswith("shared-folders.sqlite-wal") and mode == 0o600 for target, mode in modes)
+
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def test_old_excel_xls_is_extracted(shared):
+    (shared.root / "报告" / "库存.xls").write_bytes((FIXTURES / "folders-sample.xls").read_bytes())
+    assert [row["title"] for row in folders.search("chatgpt", ["山竹"])] == ["调研/报告/库存.xls"]
+    text = folders.fetch("chatgpt", "folder:research/报告/库存.xls")["text"]
+    assert "暗号山竹\t12\n" in text + "\n"  # 老式 Excel 的整数不带 .0
+    assert "暗号杨桃\t3.5" in text
+
+
+def _zip_with(path, members: dict):
+    import zipfile
+
+    with zipfile.ZipFile(path, "w") as zf:
+        for name, data in members.items():
+            zf.writestr(name, data)
+
+
+def test_zip_members_are_extracted_and_filtered(shared):
+    import io
+
+    import openpyxl
+    from onestead.i18n import text as tr
+
+    book = io.BytesIO()
+    wb = openpyxl.Workbook()
+    wb.active.append(["暗号榴莲", 7])
+    wb.save(book)
+    inner = io.BytesIO()
+    _zip_with(inner, {"深处.txt": "暗号套娃"})
+    _zip_with(shared.root / "报告" / "订单.zip", {
+        "表/订单.csv": "单号,品名\n1,暗号菠萝\n".encode("gb18030"),
+        "表/库存.xlsx": book.getvalue(),
+        "secret-token.txt": "暗号机密",
+        "图片.png": b"\x89PNG not text",
+        "inner.zip": inner.getvalue(),
+    })
+    assert [row["title"] for row in folders.search("chatgpt", ["菠萝", "榴莲"])] == ["调研/报告/订单.zip"]
+    text = folders.fetch("chatgpt", "folder:research/报告/订单.zip")["text"]
+    assert tr("folder.zip_member", name="表/订单.csv") in text and "暗号菠萝" in text
+    assert "暗号榴莲\t7" in text
+    assert "图片.png" in text.splitlines()[0]  # 清单里列出，正文不抽
+    assert "暗号机密" not in text and "secret-token" not in text
+    assert "暗号套娃" not in text
+
+
+def test_zip_member_names_written_as_gbk_are_decoded():
+    import zipfile
+
+    info = zipfile.ZipInfo("x")
+    info.filename = "补货/订单.csv".encode("gbk").decode("cp437")
+    info.flag_bits = 0
+    assert folders._zip_name(info) == "补货/订单.csv"
+    info.flag_bits = 0x800
+    info.filename = "已是UTF-8.csv"
+    assert folders._zip_name(info) == "已是UTF-8.csv"
+
+
+def test_zip_stops_reading_past_the_budget(shared, monkeypatch):
+    monkeypatch.setattr(folders, "ZIP_MAX_TOTAL", 20)
+    _zip_with(shared.root / "大包.zip", {"a.txt": "暗号樱桃" * 10})
+    text = folders.fetch("chatgpt", "folder:research/大包.zip")["text"]
+    assert "暗号樱桃" not in text
+
+
+def test_search_catches_up_when_the_index_is_stale(shared, monkeypatch):
+    monkeypatch.setattr(folders, "SYNC_INTERVAL", 3600)
+    monkeypatch.setattr(folders, "_last_synced", 0.0)  # 前面的用例同步过；这里要等后台这一轮做完
+    folders.warm()
+    deadline = time.monotonic() + 5
+    while folders._last_synced == 0 and time.monotonic() < deadline:
+        time.sleep(0.02)
+    (shared.root / "刚写的.md").write_text("暗号火龙果", encoding="utf-8")
+    monkeypatch.setattr(folders, "FRESH_SECONDS", 3600)
+    assert folders.search("chatgpt", ["火龙果"]) == []  # 刚同步过：服务里搜索不重新遍历
+    monkeypatch.setattr(folders, "FRESH_SECONDS", 0)
+    assert [row["title"] for row in folders.search("chatgpt", ["火龙果"])] == ["调研/刚写的.md"]

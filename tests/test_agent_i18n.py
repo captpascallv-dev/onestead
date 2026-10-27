@@ -49,7 +49,7 @@ def test_mcp_metadata_uses_company_language(repo, monkeypatch, remote, oauth, la
     assert mcp.name == "company-base"  # MCP 对外名字不改
     assert "OS" in mcp.instructions and "Onestead" in mcp.instructions
     assert ("第一次用" if lang == "zh" else "On first use") in mcp.instructions
-    assert text(INSTRUCTIONS, name=config.name(), owner_name=OWNER_NAME) == mcp.instructions
+    assert text(INSTRUCTIONS, title=text("mcp.title_default"), owner_name=OWNER_NAME) == mcp.instructions
     tools = asyncio.run(mcp.list_tools())
     assert tools and all(tool.description for tool in tools)
     assert all(tool.input_schema for tool in tools)

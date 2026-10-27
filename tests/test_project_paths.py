@@ -186,8 +186,8 @@ def test_copy_in_both_languages(repo, as_agent, monkeypatch):
     assert "本机目录：" in base.get_project("shop")
     assert "目录" in text("here.located", lang="zh", title="Shop", id="shop")
     assert "directory" in text("here.located", lang="en", title="Shop", id="shop")
-    assert "项目目录" in text(INSTRUCTIONS, lang="zh", name="N", owner_name="O")
-    assert "project directory" in text(INSTRUCTIONS, lang="en", name="N", owner_name="O")
+    assert "项目目录" in text(INSTRUCTIONS, lang="zh", title="N", owner_name="O")
+    assert "project directory" in text(INSTRUCTIONS, lang="en", title="N", owner_name="O")
 
 
 def test_mcp_exposes_cwd_and_paths(repo):

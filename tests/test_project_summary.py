@@ -228,7 +228,7 @@ def test_summary_write_follows_status_permission(ext, repo, as_agent):
     assert "update_project_summary" in ext("ext-zhang").company()
     assert "update_project_summary" in as_agent("codex").company()
     from onestead.i18n import text
-    assert "update_project_summary" in text(INSTRUCTIONS, name="Onestead", owner_name=OWNER_NAME)
+    assert "update_project_summary" in text(INSTRUCTIONS, title="Onestead", owner_name=OWNER_NAME)
 
 
 def test_project_summary_cli_reads_text_file(repo, tmp_path):

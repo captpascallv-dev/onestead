@@ -129,6 +129,7 @@ def test_name_default_and_configured_pages(client, as_agent, isolated_config, re
     assert config.name() == "Onestead"
     assert "<title>Onestead</title>" in client.get("/").text
     assert as_agent("codex").company().startswith("# Onestead · 入职说明")
+    assert build_server(str(repo), "codex").instructions.startswith("Onestead（简称 OS）：")
     isolated_config.write_text('name = "协作站 <团队>"\n', encoding="utf-8")
     index = client.get("/").text
     assert "<title>协作站 &lt;团队&gt;</title>" in index

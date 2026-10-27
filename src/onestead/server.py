@@ -35,8 +35,11 @@ def build_server(root: str, agent_key: str | None, *, remote: bool = False, oaut
     config.owner_key()
     owner_name = owner_name_at(root)
     Signed = Annotated[str | None, Field(description=tr("agent.374"))]
+    name = config.name()
+    # 名字就是产品名时不再括注一遍产品名
+    title = tr("mcp.title_default") if name == "Onestead" else tr("mcp.title", name=name)
     mcp = MCPServer("company-base", title=config.display_name(),
-                    instructions=tr(INSTRUCTIONS, name=config.name(), owner_name=owner_name), **server_kwargs)
+                    instructions=tr(INSTRUCTIONS, title=title, owner_name=owner_name), **server_kwargs)
 
     def run(name: str, *args, **kwargs) -> str | SearchOutput | FetchOutput:
         key = agent_key

@@ -98,7 +98,7 @@ Local clients start `onestead-mcp` over stdio. Set `ONESTEAD_AGENT` to the regis
 
 `onestead connect` lists each installed client, the user-level file it would change, and the `onestead` entry it would write. It does not write anything. `onestead connect --apply` writes those files. Before an existing file is replaced, the command copies `<filename>.onestead-backup-<YYYYMMDD-HHMMSS>` next to it (the time is UTC+8), then replaces the file from a temporary file in the same directory. A file that already matches is left unchanged and is not backed up again.
 
-The command is `onestead-mcp` when that program is in the current Python environment; otherwise it is the current interpreter with `-m onestead.server`. An existing `onestead` or `company-base` entry keeps the identity stored in `ONESTEAD_AGENT` or `COMPANY_BASE_AGENT`. If `company-base` is still present, `--apply` removes it and writes `onestead` instead. The preview says that the old entry will be replaced. `--client claude-code`, `--client codex`, or `--client cursor` limits the command to that client. Repeat the flag to select more than one.
+The command is `onestead-mcp` when that program is in the current Python environment; otherwise it is the current interpreter with `-m onestead.server`. An existing `onestead` or `company-base` entry keeps the identity stored in `ONESTEAD_AGENT` or `COMPANY_BASE_AGENT`. If `company-base` is still present, `--apply` removes it and writes `onestead` instead. The preview says that the old entry will be replaced. `--client claude-code`, `--client codex`, `--client cursor`, or `--client workbuddy` limits the command to that client. Repeat the flag to select more than one.
 
 ```powershell
 onestead connect
@@ -110,6 +110,7 @@ onestead connect --apply
 | Claude Code | Copy the printed `claude mcp add` command, or merge the JSON block into `.mcp.json`. |
 | Codex | Merge the printed `[mcp_servers.onestead]` block into `~/.codex/config.toml`. |
 | Cursor | Merge the printed JSON block into `mcp.json`, usually `~/.cursor/mcp.json`. |
+| WorkBuddy | Merge the printed JSON block into `~/.workbuddy/mcp.json`. |
 | ChatGPT | Publish the remote service, then add a custom MCP connector at `https://base.example.com/chatgpt/mcp` with OAuth. On the consent page, use a token issued for a remote-enabled agent. |
 
 Use your own hostname in the ChatGPT URL. A human's web-login token cannot authorize the connector. See [ChatGPT setup](docs/deploy.md#chatgpt).

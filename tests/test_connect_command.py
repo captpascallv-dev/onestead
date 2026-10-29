@@ -362,3 +362,21 @@ def test_init_prints_connect_hint_at_the_prompt_and_the_end(tmp_path, monkeypatc
     assert out.count("接本机 agent：`onestead connect`") >= 2
     assert out.rstrip().splitlines()[-1].startswith("下一步：")
     assert (home / ".onestead" / "config.toml").is_file()
+
+
+def test_workbuddy_entry_keeps_other_servers_and_type(tmp_path, monkeypatch, capsys):
+    home = _home(tmp_path, monkeypatch)
+    mcp = _mcp(monkeypatch, home, present=True)
+    path = home / ".workbuddy" / "mcp.json"
+    other = {"type": "stdio", "command": "other.cmd", "disabled": True, "env": {"X": "keep"}}
+    _put(path, (json.dumps({"mcpServers": {"other": other}}, indent=2) + "\n").encode("utf-8"))
+    assert run(["connect", "--client", "workbuddy", "--apply"]) == 0
+    out = capsys.readouterr().out
+    assert "身份：workbuddy" in _section(out, "workbuddy")
+    servers = json.loads(path.read_text(encoding="utf-8"))["mcpServers"]
+    assert servers["other"] == other
+    assert servers["onestead"] == {"type": "stdio", "command": str(mcp), "env": {"ONESTEAD_AGENT": "workbuddy"}}
+    assert len(_backups(home)) == 1
+    assert run(["connect", "--client", "workbuddy", "--apply"]) == 0
+    assert "已是最新。" in capsys.readouterr().out
+    assert len(_backups(home)) == 1

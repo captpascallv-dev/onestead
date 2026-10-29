@@ -29,7 +29,7 @@ Open the local web app with `python -m onestead.web`, or ask an agent to call `c
 
 Add a member for that agent under `people/`. Set `kind: agent` and `owner: {{owner_key}}`.
 
-Paste the Claude Code, Codex, or Cursor snippet printed by `onestead init`, and set `ONESTEAD_AGENT` to that member's key.
+Paste the Claude Code, Codex, Cursor, or WorkBuddy snippet printed by `onestead init`, and set `ONESTEAD_AGENT` to that member's key.
 
 ## 分工
 

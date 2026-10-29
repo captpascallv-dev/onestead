@@ -98,7 +98,7 @@ python -m onestead.web
 
 `onestead connect` 会列出本机已安装的客户端、要改的用户级配置文件，以及将写入的 `onestead` 项，但不会写任何文件。`onestead connect --apply` 才写入。已有文件会先在同目录复制为 `<文件名>.onestead-backup-<YYYYMMDD-HHMMSS>`（台北时间，UTC+8），再用同目录的临时文件替换原文件。内容已经一致时不写，也不再备份。
 
-当前 Python 环境里有 `onestead-mcp` 就用它，否则用当前解释器加 `-m onestead.server`。原来的 `onestead` 或 `company-base` 项若已有 `ONESTEAD_AGENT` 或 `COMPANY_BASE_AGENT`，沿用那个身份。文件里若还有 `company-base`，`--apply` 会删掉它并写入 `onestead`，预览会说明旧项会被替换。`--client claude-code`、`--client codex` 或 `--client cursor` 只处理指定的一家，这个参数可以重复。
+当前 Python 环境里有 `onestead-mcp` 就用它，否则用当前解释器加 `-m onestead.server`。原来的 `onestead` 或 `company-base` 项若已有 `ONESTEAD_AGENT` 或 `COMPANY_BASE_AGENT`，沿用那个身份。文件里若还有 `company-base`，`--apply` 会删掉它并写入 `onestead`，预览会说明旧项会被替换。`--client claude-code`、`--client codex`、`--client cursor` 或 `--client workbuddy` 只处理指定的一家，这个参数可以重复。
 
 ```powershell
 onestead connect
@@ -110,6 +110,7 @@ onestead connect --apply
 | Claude Code | 复制打印的 `claude mcp add` 命令，或把 JSON 块合并到 `.mcp.json`。 |
 | Codex | 把打印的 `[mcp_servers.onestead]` 块合并到 `~/.codex/config.toml`。 |
 | Cursor | 把打印的 JSON 块合并到 `mcp.json`，通常是 `~/.cursor/mcp.json`。 |
+| WorkBuddy | 把打印的 JSON 块合并到 `~/.workbuddy/mcp.json`。 |
 | ChatGPT | 先部署远程服务，再添加自定义 MCP 连接器，地址为 `https://base.example.com/chatgpt/mcp`，认证选 OAuth。授权页使用允许远程接入的 agent 口令。 |
 
 ChatGPT 地址中的域名换成你自己的。人用来登录网页的口令不能授权连接器。详见 [ChatGPT 接入](docs/deploy.md#chatgpt)。

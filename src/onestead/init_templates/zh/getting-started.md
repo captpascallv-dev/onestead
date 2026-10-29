@@ -29,7 +29,7 @@ updated: {{today}}
 
 在 `people/` 下给这个 agent 加一个成员，`kind` 写 `agent`，`owner` 写 `{{owner_key}}`。
 
-把 `onestead init` 打印的 Claude Code、Codex 或 Cursor 片段贴进对应的配置，并把 `ONESTEAD_AGENT` 设成那个成员的身份键。
+把 `onestead init` 打印的 Claude Code、Codex、Cursor 或 WorkBuddy 片段贴进对应的配置，并把 `ONESTEAD_AGENT` 设成那个成员的身份键。
 
 ## 分工
 

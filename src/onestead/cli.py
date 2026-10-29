@@ -112,7 +112,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--force-config", action="store_true", help=tr("agent.176"))
     s = sub.add_parser("connect", parents=[common], help=tr("connect.help"))
     s.add_argument("--apply", action="store_true", help=tr("connect.help_apply"))
-    s.add_argument("--client", action="append", choices=("claude-code", "codex", "cursor"),
+    s.add_argument("--client", action="append", choices=("claude-code", "codex", "cursor", "workbuddy"),
                    help=tr("connect.help_client"))
     s.add_argument("--agent-key", help=tr("connect.help_agent"))
     s = sub.add_parser("company", parents=[common], help=tr("agent.177"))

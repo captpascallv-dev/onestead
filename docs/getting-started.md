@@ -1,6 +1,6 @@
 # Getting started
 
-Onestead (package and command: `onestead`) reads company facts from a git repository you own. One command creates that repository, writes the local config, and prints connection instructions for Claude Code, Codex, Cursor, and ChatGPT.
+Onestead (package and command: `onestead`) reads company facts from a git repository you own. One command creates that repository, writes the local config, and prints connection instructions for Claude Code, Codex, Cursor, WorkBuddy, and ChatGPT.
 
 ```text
 onestead init <data-dir> --owner <key> --name <display-name> [--lang en|zh] [--force-config]
@@ -52,6 +52,7 @@ The MCP program is `onestead-mcp` in the scripts directory of the Python environ
 - **Claude Code.** A `claude mcp add` command, or a `.mcp.json` snippet.
 - **Codex.** A `[mcp_servers.onestead]` block for `~/.codex/config.toml`.
 - **Cursor.** An `mcp.json` snippet, usually `~/.cursor/mcp.json`.
+- **WorkBuddy.** An `mcp.json` snippet for `~/.workbuddy/mcp.json`.
 - **ChatGPT.** Deploy the remote server first, as described in [Deploy](deploy.md), then add a custom MCP connector with OAuth. The command does not print a URL. You use your own public hostname.
 
 An agent that cannot use MCP calls `onestead <command> --as <key>` instead.

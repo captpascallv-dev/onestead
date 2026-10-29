@@ -232,21 +232,22 @@ Verification clones live in the system temporary directory. Windows retains its 
 
 ## Connect local agents
 
-`onestead connect` looks for Claude Code, Codex, and Cursor when that client's user-level config file or directory is already present. With no extra flag it prints each file and the `onestead` entry it would write. It does not write anything.
+`onestead connect` looks for Claude Code, Codex, Cursor, and WorkBuddy when that client's user-level config file or directory is already present. With no extra flag it prints each file and the `onestead` entry it would write. It does not write anything.
 
 `onestead connect --apply` writes those files. Before replacing an existing file it copies `<filename>.onestead-backup-<YYYYMMDD-HHMMSS>` into the same directory. The timestamp is UTC+8. The new contents are written to a temporary file in that directory and then replace the original. A file that already matches is left untouched and is not backed up again. The command reports that file as already up to date.
 
-The server name is `onestead`. The command is `onestead-mcp` from the current Python environment when that program exists; otherwise it is the current Python interpreter with `-m onestead.server`. The identity is the `ONESTEAD_AGENT` environment variable. `--agent-key` sets it when exactly one `--client` is given. Otherwise the command keeps `ONESTEAD_AGENT` or `COMPANY_BASE_AGENT` from an existing `company-base` entry, then from an existing `onestead` entry, and otherwise uses `claude`, `codex`, or `cursor` for those clients.
+The server name is `onestead`. The command is `onestead-mcp` from the current Python environment when that program exists; otherwise it is the current Python interpreter with `-m onestead.server`. The identity is the `ONESTEAD_AGENT` environment variable. `--agent-key` sets it when exactly one `--client` is given. Otherwise the command keeps `ONESTEAD_AGENT` or `COMPANY_BASE_AGENT` from an existing `company-base` entry, then from an existing `onestead` entry, and otherwise uses `claude`, `codex`, `cursor`, or `workbuddy` for those clients.
 
 If the same file still has a `company-base` entry, `--apply` removes it and writes `onestead` in its place. The preview says that the old entry will be replaced. The identity already stored on that entry is kept.
 
-`--client claude-code`, `--client codex`, and `--client cursor` limit which client is handled. Repeat the flag to select more than one. A client with neither a config file nor a config directory is omitted. If one file cannot be parsed, or its TOML cannot be edited safely, that client is skipped and the others are still written.
+`--client claude-code`, `--client codex`, `--client cursor`, and `--client workbuddy` limit which client is handled. Repeat the flag to select more than one. A client with neither a config file nor a config directory is omitted. If one file cannot be parsed, or its TOML cannot be edited safely, that client is skipped and the others are still written.
 
 | Client | User-level file |
 | --- | --- |
 | Claude Code | `~/.claude.json`. Only the `mcpServers` entry for this server is changed; every other key is kept. |
 | Codex | `$CODEX_HOME/config.toml`, or `~/.codex/config.toml` when `CODEX_HOME` is unset. The command writes `[mcp_servers.onestead]` and `[mcp_servers.onestead.env]`. |
 | Cursor | `~/.cursor/mcp.json`, under `mcpServers`. |
+| WorkBuddy | `~/.workbuddy/mcp.json`, under `mcpServers`. The entry also carries `"type": "stdio"`, as WorkBuddy's own entries do. |
 
 Codex is edited as text. Old `mcp_servers.onestead` and `mcp_servers.company-base` table blocks are removed, including their subtables, and the new blocks are appended. Other text, including comments, stays byte for byte. A JSON file that does not parse, and a TOML file whose structure is not safe to edit this way, are left unchanged.
 

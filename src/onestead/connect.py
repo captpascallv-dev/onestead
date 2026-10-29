@@ -36,6 +36,9 @@ def connect_prompt(owner_name: str) -> str:
     blob = json.dumps(
         {"mcpServers": {"onestead": {"command": str(mcp), "env": {"ONESTEAD_AGENT": tr("agent.254")}}}},
         ensure_ascii=False, indent=2)
+    workbuddy_blob = json.dumps(
+        {"mcpServers": {"onestead": {"type": "stdio", "command": str(mcp), "env": {"ONESTEAD_AGENT": tr("agent.254")}}}},
+        ensure_ascii=False, indent=2)
     toml = "\n".join([
         "[mcp_servers.onestead]",
         f"command = {toml_basic_string(str(mcp))}",
@@ -85,6 +88,16 @@ def connect_prompt(owner_name: str) -> str:
         blob,
         "```",
         "",
+        "## WorkBuddy",
+        "",
+        tr("connect.workbuddy"),
+        "",
+        tr("agent.247", v0=mcp),
+        "",
+        "```json",
+        workbuddy_blob,
+        "```",
+        "",
         "## ChatGPT",
         "",
         tr("agent.251", v0=mcp),
@@ -94,8 +107,8 @@ def connect_prompt(owner_name: str) -> str:
     return intro + "\n\n" + sections + "\n"
 
 
-_CLIENTS = ("claude-code", "codex", "cursor")
-_DEFAULT_AGENT = {"claude-code": "claude", "codex": "codex", "cursor": "cursor"}
+_CLIENTS = ("claude-code", "codex", "cursor", "workbuddy")
+_DEFAULT_AGENT = {"claude-code": "claude", "codex": "codex", "cursor": "cursor", "workbuddy": "workbuddy"}
 _TABLES = ("mcp_servers.onestead", "mcp_servers.company-base")
 _HEX = frozenset("0123456789abcdefABCDEF")
 
@@ -169,7 +182,7 @@ def _locations(client: str) -> tuple[Path, Path]:
         override = os.environ.get("CODEX_HOME")
         root = Path(override).expanduser() if override else home / ".codex"
         return root / "config.toml", root
-    root = home / ".cursor"
+    root = home / (".workbuddy" if client == "workbuddy" else ".cursor")
     return root / "mcp.json", root
 
 
@@ -221,7 +234,7 @@ def _fresh(client: str, command: str, cmd_args: list[str], identity: str) -> tup
     if client == "codex":
         block = _toml_block(command, cmd_args, identity)
         return block.encode("utf-8"), block.rstrip("\n")
-    entry = _entry(command, cmd_args, identity)
+    entry = _entry(client, command, cmd_args, identity)
     payload = _dump_json({"mcpServers": {"onestead": entry}})
     return payload, json.dumps(entry, ensure_ascii=False, indent=2)
 
@@ -237,7 +250,7 @@ def _plan_json(client, path, raw, command, cmd_args, override, members) -> _Plan
         return _Plan(client, path, "skip", reason=tr("connect.reason_shape"))
     servers = data.get("mcpServers") or {}
     identity = override or _identity(servers) or _DEFAULT_AGENT[client]
-    entry = _entry(command, cmd_args, identity)
+    entry = _entry(client, command, cmd_args, identity)
     note = _member_note(members, identity)
     replacing = "company-base" in servers
     if not replacing and servers.get("onestead") == entry:
@@ -280,8 +293,9 @@ def _plan_toml(client, path, raw, command, cmd_args, override, members) -> _Plan
                  preview=block.rstrip("\n"), payload=new_text.encode("utf-8"))
 
 
-def _entry(command: str, cmd_args: list[str], identity: str) -> dict:
-    entry = {"command": command}
+def _entry(client: str, command: str, cmd_args: list[str], identity: str) -> dict:
+    """WorkBuddy 的 mcp.json 里每项都写明 type，照它的样子补上；其他家不加，免得已接好的被判成要改。"""
+    entry = {"type": "stdio", "command": command} if client == "workbuddy" else {"command": command}
     if cmd_args:
         entry["args"] = list(cmd_args)
     entry["env"] = {"ONESTEAD_AGENT": identity}

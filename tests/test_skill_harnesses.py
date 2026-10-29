@@ -13,7 +13,7 @@ from .support import SID, grant, skill
 def test_default_harnesses_use_generic_paths(skill_home):
     assert config.skill_harnesses() == []
     table = {row["key"]: row for row in skillscan.harness_table()}
-    assert list(table) == ["claude", "codex", "pi", "grok", "cursor"]
+    assert list(table) == ["claude", "codex", "pi", "grok", "cursor", "workbuddy"]
     assert table["pi"] == {"key": "pi", "name": "PI", "user": [
         skill_home / ".pi" / "agent" / "skills", skill_home / ".pi" / "skills"]}
 
@@ -79,7 +79,7 @@ def test_harness_environment_priority(isolated_config, monkeypatch):
     assert skillscan.harness_table()[-1]["key"] == "env-agent"
     monkeypatch.setenv("ONESTEAD_SKILL_HARNESSES", "[]")
     assert config.skill_harnesses() == []
-    assert [row["key"] for row in skillscan.harness_table()] == ["claude", "codex", "pi", "grok", "cursor"]
+    assert [row["key"] for row in skillscan.harness_table()] == ["claude", "codex", "pi", "grok", "cursor", "workbuddy"]
     monkeypatch.setenv("ONESTEAD_SKILL_HARNESSES", "")
     with pytest.raises(BaseError, match="JSON"):
         config.skill_harnesses()  # 新变量即使为空，也不能退回旧变量或文件。

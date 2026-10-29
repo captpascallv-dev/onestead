@@ -277,7 +277,7 @@ def build_server(root: str, agent_key: str | None, *, remote: bool = False, oaut
         fresh: Annotated[bool, Field(description=tr("agent.417"))] = False,
         include_unlisted: Annotated[bool, Field(description=tr("api.include_unlisted"))] = False,
     ) -> str:
-        """Skill 广场：Claude、Codex、PI、Grok CLI、Cursor，以及配置的额外本机工具和远程快照各装了哪些 Skill，各家内容一不一样。"""
+        """Skill 广场：Claude、Codex、PI、Grok CLI、Cursor、WorkBuddy，以及配置的额外本机工具和远程快照各装了哪些 Skill，各家内容一不一样。"""
         return run("list_skills", only_alerts, fresh, include_unlisted)
 
     @mcp.tool(annotations=READ, description=tr("agent.373", v0=owner_name))

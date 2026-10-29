@@ -112,7 +112,7 @@ def test_web_skills_page_open_and_activity(machine, client, as_agent, monkeypatc
     by = {r["id"]: r for r in data["skills"]}
     assert by["shared-one"]["record"]["project"] == {"id": "alpha", "name": "阿尔法"}
     assert by["cloud-only"]["installs"] == {} and by["cloud-only"]["registered"]
-    assert [h["key"] for h in data["harnesses"]] == ["claude", "codex", "pi", "grok", "cursor", "sample-agent", "assistant"]
+    assert [h["key"] for h in data["harnesses"]] == ["claude", "codex", "pi", "grok", "cursor", "workbuddy", "sample-agent", "assistant"]
     opened = []
     monkeypatch.setattr("os.startfile", lambda p: opened.append(p), raising=False)
     path = by["own-skill"]["installs"]["claude"]["path"]

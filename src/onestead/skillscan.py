@@ -1,6 +1,6 @@
 """Skill 广场的扫描：跟踪的几家各装了哪些 Skill、内容一不一样。只读，不改任何文件。
 
-扫描常见本机工具：Claude、Codex、PI、Grok CLI、Cursor；额外本机工具和远程快照由配置添加。
+扫描常见本机工具：Claude、Codex、PI、Grok CLI、Cursor、WorkBuddy；额外本机工具和远程快照由配置添加。
 联到共用目录 `.agents\\skills` 的算同一份；插件自带的、各家内置的只计数，页面上折叠。
 内容比对用 SHA-256：技能目录里的文件按相对路径排序，路径和字节一起算。
 不进 .git、node_modules、work 这类目录，不读像凭据的文件。
@@ -63,6 +63,9 @@ def harness_table() -> list[dict]:
          "builtin": [h / ".grok" / "bundled" / "skills"]},
         {"key": "cursor", "name": "Cursor", "user": [h / ".cursor" / "skills"], "builtin": [h / ".cursor" / "skills-cursor"],
          "plugins": [h / ".cursor" / "plugins" / "cache"]},
+        # WorkBuddy 安装包里自带的那批随系统和安装位置变，需要时在配置里按同一 key 追加 builtin
+        {"key": "workbuddy", "name": "WorkBuddy", "user": [h / ".workbuddy" / "skills"],
+         "plugins": [h / ".workbuddy" / "plugins" / "cache"]},
     ]
     by_key = {row["key"]: row for row in table}
     for row in config.skill_harnesses():

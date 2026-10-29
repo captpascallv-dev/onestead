@@ -97,9 +97,9 @@ class LocalProjection:
             result["feishu_pending"] = pending()
         return result
 
-    async def skill_list(self, visible, by_id, fresh, principal, run, shared_list):
+    async def skill_list(self, visible, by_id, fresh, principal, run, shared_list, include_unlisted=False):
         require_local_owner(principal)
-        return await run(views.skill_page, visible, by_id, fresh)
+        return await run(views.skill_page, visible, by_id, fresh, include_unlisted)
 
     def agents_page(self, rows, viewer, docs, principal, prompt):
         for row in rows:
@@ -173,7 +173,7 @@ class RemoteProjection:
     def members_page(self, viewer, docs, visible, principal, tokens, pending, urls):
         return {"items": present.members(viewer, docs)}
 
-    async def skill_list(self, visible, by_id, fresh, principal, run, shared_list):
+    async def skill_list(self, visible, by_id, fresh, principal, run, shared_list, include_unlisted=False):
         return {"mode": "shared", "skills": await run(shared_list())}
 
     def agents_page(self, rows, viewer, docs, principal, prompt):

@@ -1,6 +1,8 @@
 "use strict";
 // 网页文字；占位参数用 {0}、{1}，只作为文字插入，不拼 HTML。
 const I18N_ZH = {
+  "api.unlisted": "已撤下",
+  "api.include_unlisted": "包含已撤下的 Skill",
   "app.001": "主人",
   "app.002": "同事",
   "app.003": "这一页只有 {0} 能用。",

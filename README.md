@@ -120,6 +120,8 @@ If a local client cannot use MCP, the CLI uses the same permissions:
 onestead company --as codex
 ```
 
+Programs can use the JSON interface, [`onestead api`](docs/api.md).
+
 ## Give colleagues and remote agents access
 
 ### Publish the workspace

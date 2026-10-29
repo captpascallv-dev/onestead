@@ -419,10 +419,12 @@ def member_list(visible: list[Doc], token_rows: list[dict] | None = None) -> lis
 
 # ---------- Skill 广场 ----------
 
-def skill_page(visible: list[Doc], by_id, fresh: bool = False) -> dict:
+def skill_page(visible: list[Doc], by_id, fresh: bool = False, include_unlisted: bool = False) -> dict:
     data = skillscan.cached_scan(fresh)
     recs = {d.id: d for d in visible if d.kind == "skill"}
     rows = skillscan.summarize(data, {k: d.meta for k, d in recs.items()})
+    if not include_unlisted:
+        rows = [r for r in rows if r["listed"]]
     members = member_keys(visible)
     viewers = [(d.title, make_viewer(visible, key, allow_owner=True)) for key, d in members.items()]
     for r in rows:
@@ -444,7 +446,7 @@ def skill_page(visible: list[Doc], by_id, fresh: bool = False) -> dict:
         if public or authorized:
             package = skillshare.package_manifest(r["ref"]["path"]) if r["ref"] else skillshare.Package()
             r["sharing"] |= {"withheld": package.withheld, "too_large": package.too_large,
-                              "available": package.skill_md is not None and r["alert"] != "broken"}
+                              "available": r["listed"] and package.skill_md is not None and r["alert"] != "broken"}
     harnesses = [{"key": h["key"], "name": h["name"], "snapshot": h["snapshot"], "roots": h["roots"],
                   "builtin": h["builtin"], "plugins": h["plugins"], "install_dir": skills.install_dir(h["key"])}
                  for h in data["harnesses"]]

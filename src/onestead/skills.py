@@ -13,7 +13,7 @@ from .i18n import label as system_label, text as tr
 import re
 
 from . import gitops, skillscan, skillshare
-from .store import BaseError, Doc, Viewer
+from .store import BaseError, Doc, NotFound, Viewer
 from .textutil import _cell, _check_text, _dump_front, _strip_title
 from .redact import safe_text, safe_url
 
@@ -28,9 +28,10 @@ STATE_NAMES = {"same": "一致", "behind": "落后", "differs": "和正本不同
 def clean(item: dict, project_ids: set[str], *, partial: bool = False) -> dict:
     if not isinstance(item, dict):
         raise BaseError(tr("agent.469"))
-    unknown = set(item) - set(EDITABLE) - ({"id"} if not partial else set())
+    editable = (*EDITABLE, "listed") if partial else EDITABLE
+    unknown = set(item) - set(editable) - ({"id"} if not partial else set())
     if unknown:
-        raise BaseError(tr("agent.470", v0='、'.join(sorted(unknown)), v1='、'.join(EDITABLE)))
+        raise BaseError(tr("agent.470", v0='、'.join(sorted(unknown)), v1='、'.join(editable)))
     out: dict = {}
     for key, limit in TEXT_FIELDS.items():
         required = key == "one_line" and not partial
@@ -48,6 +49,10 @@ def clean(item: dict, project_ids: set[str], *, partial: bool = False) -> dict:
         out["project"] = pid
     if "notes" in item:
         out["notes"] = _check_text(tr("agent.008"), item.get("notes"), required=False, limit=3000)
+    if "listed" in item:
+        if not isinstance(item["listed"], bool):
+            raise BaseError(tr("api.listed_boolean"))
+        out["listed"] = item["listed"]
     return out
 
 
@@ -74,13 +79,14 @@ def shared_packages(viewer: Viewer, docs: list[Doc], data: dict, rows: list[dict
     if not (viewer.known and viewer.valid and (viewer.assigned or viewer.remote or viewer.is_owner)):
         return {}
     public = {d.id for d in docs if d.kind == "skill" and not d.problem and d.sensitivity == "public"}
+    unlisted = {d.id for d in docs if d.kind == "skill" and d.meta.get("listed") is False}
     scanned = {i["dir"] for h in data["harnesses"] for i in h["items"]}
     scanned |= {i["dir"] for i in data["shared"]["items"]}
     granted = (viewer.skills | public) & scanned if viewer.assigned else scanned
     result = {}
     for row in rows:
         sid = row["id"]
-        if (sid not in granted or not ID_RE.fullmatch(sid) or not row["ref"] or row["ref"].get("broken")
+        if (not row["listed"] or sid in unlisted or sid not in granted or not ID_RE.fullmatch(sid) or not row["ref"] or row["ref"].get("broken")
                 or row["alert"] == "broken"
                 or (skill_id is not None and skill_id != sid)):
             continue
@@ -133,7 +139,7 @@ class SkillMixin:
         data = skillscan.cached_scan(fresh)
         return data, skillscan.summarize(data, records_of(visible))
 
-    def list_skills(self, only_alerts: bool = False, fresh: bool = False) -> str:
+    def list_skills(self, only_alerts: bool = False, fresh: bool = False, include_unlisted: bool = False) -> str:
         viewer, docs, visible = self._ctx()
         if viewer.assigned or viewer.remote:
             data, rows = self._skill_rows(docs, False)
@@ -148,13 +154,14 @@ class SkillMixin:
             return "\n".join(out) + "\n"
         self._internal_only(tr("agent.473"))
         data, rows = self._skill_rows(visible, fresh)
+        listed = [r for r in rows if r["listed"]]
         names = {h["key"]: h["name"] for h in data["harnesses"]}
         behind = [r for r in rows if r["alert"] == "behind"]
         broken = [r for r in rows if r["alert"] == "broken"]
         out = [tr("agent.474", v0=data['scanned_at'][:16].replace('T', ' ')), "",
-               tr("agent.475", v0=len(rows), v1=len(behind), v2=len(broken)),
+               tr("agent.475", v0=len(listed), v1=len(behind), v2=len(broken)),
                tr("agent.476", v0=data['shared']['path']), ""]
-        shown = [r for r in rows if r["alert"]] if only_alerts else rows
+        shown = [r for r in rows if r["alert"]] if only_alerts else (rows if include_unlisted else listed)
         out += [tr("agent.477"), "|---|---|---|---|"]
         for r in shown:
             where = "、".join(f"{names[k]}" + (tr("agent.514") if v["in_shared_dir"] else
@@ -162,6 +169,8 @@ class SkillMixin:
                              ("" if v["state"] == "same" else f"：{system_label(STATE_NAMES[v['state']])}")
                              for k, v in r["installs"].items()) or (tr("agent.500") if r["in_shared"] else tr("agent.501"))
             alert = {"behind": tr("agent.512"), "broken": tr("agent.513")}.get(r["alert"], "")
+            if not r["listed"]:
+                alert = tr("api.unlisted")
             out.append(f"| `{r['id']}` | {_cell(r['name'])} | {_cell(where)} | {alert} |")
         out += ["", tr("agent.478"), ""]
         for h in data["harnesses"]:
@@ -197,11 +206,13 @@ class SkillMixin:
         sid = (skill_id or "").strip()
         r = next((x for x in rows if x["id"] == sid), None)
         if not r:
-            raise BaseError(tr("agent.480", v0=skill_id))
+            raise NotFound(tr("agent.480", v0=skill_id))
         names = {h["key"]: h["name"] for h in data["harnesses"]}
         rec = next((d for d in visible if d.kind == "skill" and d.id == sid), None)
         m = rec.meta if rec else {}
         out = [f"# {r['name']}（`{sid}`）", ""]
+        if not r["listed"]:
+            out.append(tr("api.unlisted"))
         if m.get("one_line"):
             out.append(tr("agent.022", v0=m['one_line']))
         if r["description"]:
@@ -274,6 +285,11 @@ class SkillMixin:
         return self.register_skills([skill], None, signed_as)
 
     def register_skills(self, skills: list, note: str | None, signed_as: str | None = None) -> str:
+        count, commit = self._register_skills_commit(skills, note, signed_as)
+        return tr("agent.467", v0=count, v1=commit)
+
+    def _register_skills_commit(self, skills: list, note: str | None,
+                                signed_as: str | None = None) -> tuple[int, str]:
         signed_as = self._sign(signed_as)
         if not isinstance(skills, list) or not skills:
             raise BaseError(tr("agent.483"))
@@ -300,9 +316,13 @@ class SkillMixin:
                 note = _check_text(tr("agent.008"), note, limit=200).replace("\n", " ")
                 subject = f"Skill：登记了 {len(files)} 个（{note}）"
             commit = gitops.write_and_commit(self.root, files, subject, "register_skill", viewer.key, signed_as)
-        return tr("agent.467", v0=len(files), v1=commit)
+        return len(files), commit
 
     def update_skill(self, skill_id: str, changes: dict, signed_as: str | None = None) -> str:
+        commit = self._update_skill_commit(skill_id, changes, signed_as)
+        return tr("agent.468", v0=(skill_id or "").strip(), v1=commit) if commit else tr("agent.031")
+
+    def _update_skill_commit(self, skill_id: str, changes: dict, signed_as: str | None = None) -> str | None:
         signed_as = self._sign(signed_as)
         if not isinstance(changes, dict) or not changes:
             raise BaseError(tr("agent.484"))
@@ -310,7 +330,7 @@ class SkillMixin:
             viewer, _, visible = self._writer()
             d = next((x for x in visible if x.kind == "skill" and x.id == (skill_id or "").strip()), None)
             if not d:
-                raise BaseError(tr("agent.499", v0=skill_id))
+                raise NotFound(tr("agent.499", v0=skill_id))
             c = clean(changes, {x.id for x in visible if x.kind == "project"}, partial=True)
             notes = c.pop("notes", None)
             meta = dict(d.meta)
@@ -319,7 +339,10 @@ class SkillMixin:
             meta["updated_by"] = gitops.author_name(viewer.key, signed_as)
             content = file_content(meta, notes_of(d) if notes is None else notes)
             if content == d.raw:
-                return tr("agent.031")
-            commit = gitops.write_and_commit(self.root, {d.rel: content}, f"Skill：改了「{meta.get('title') or d.id}」",
+                return None
+            title = meta.get('title') or d.id
+            subject = (tr("api.skill_relisted" if c["listed"] else "api.skill_unlisted", title=title)
+                       if "listed" in c else f"Skill：改了「{title}」")
+            commit = gitops.write_and_commit(self.root, {d.rel: content}, subject,
                                              "update_skill", viewer.key, signed_as)
-        return tr("agent.468", v0=d.id, v1=commit)
+        return commit

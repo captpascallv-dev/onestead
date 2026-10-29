@@ -312,6 +312,7 @@ def summarize(data: dict, records: dict[str, dict]) -> list[dict]:
                              "damaged": it["damaged"][:5], "damaged_count": len(it["damaged"]), "newest": it["newest"], "hash": it["hash"], "files": it["files"]}
         sample = ref or next(iter(s["copies"].values()), None) or {}
         rec = records.get(sid, {})
+        listed = rec.get("listed", True) is not False
         in_shared = sid in shared_by_dir
         sc = shared_by_dir.get(sid)
         shared_copy = {"state": state_of(sc), "path": sc["path"], "newest": sc["newest"], "files": sc["files"]} if sc else None
@@ -324,7 +325,8 @@ def summarize(data: dict, records: dict[str, dict]) -> list[dict]:
             "copies": [{"path": c["path"], "real": c["real"], "newest": c["newest"], "hash": c["hash"], "files": c["files"],
                         "shared": c["shared"], "dangling": c["dangling"], "no_skill_md": c["no_skill_md"]}
                        for c in s["copies"].values()],
-            "alert": "behind" if any(i["state"] in ("behind", "differs") for i in installs.values())
+            "listed": listed,
+            "alert": None if not listed else "behind" if any(i["state"] in ("behind", "differs") for i in installs.values())
                      else "broken" if any(i["state"] == "broken" for i in installs.values()) else None,
             "registered": sid in records,
         })

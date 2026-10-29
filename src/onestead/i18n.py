@@ -863,3 +863,20 @@ TEXT.update({
     "connect.member_unknown": ("没能读取数据仓库，未核对该身份是不是成员。", "Could not read the data repository, so the identity was not checked against members."),
     "connect.agent_key_client": ("--agent-key 只能和单独一个 --client 一起用。", "--agent-key requires exactly one --client."),
 })
+
+TEXT.update({
+    "api.help": ("供程序调用的单请求 JSON 接口", "Single-request JSON interface for programs"),
+    "api.fields": ("请求缺少必填字段或包含未知字段。", "The request has missing required fields or unknown fields."),
+    "api.type": ("字段 {field} 的类型不正确。", "Field {field} has an invalid type."),
+    "api.json": ("请求必须是合法的 UTF-8 JSON。", "The request must be valid UTF-8 JSON."),
+    "api.request": ("请求必须是一个 JSON 对象。", "The request must be a JSON object."),
+    "api.method": ("未知的 API 方法。", "Unknown API method."),
+    "api.signature": ("写入必须提供非空的 signed_as。", "Writes require a non-blank signed_as."),
+    "api.identity": ("请使用已登记且有效的成员身份。", "Use a registered, active member identity."),
+    "api.internal": ("底座暂时无法完成这次请求。", "Onestead could not complete this request."),
+    "api.listed_boolean": ("listed 只能是布尔值。", "listed must be a boolean."),
+    "api.unlisted": ("已撤下", "Unlisted"),
+    "api.include_unlisted": ("包含已撤下的 Skill", "Include unlisted skills"),
+    "api.skill_unlisted": ("Skill：撤下了「{title}」", "Skill: unlisted {title}"),
+    "api.skill_relisted": ("Skill：重新上架了「{title}」", "Skill: relisted {title}"),
+})

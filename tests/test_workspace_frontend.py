@@ -67,6 +67,29 @@ context.findButton = (node, text) => node.querySelectorAll('button').find(x => x
 '''
 
 CASES = {
+    "撤下技能的显示开关与计数": r'''
+payloads = LOCAL; await loadMe();
+const listed = { id: 'example', name: 'Available skill', description: '', installs: {}, alert: null, listed: true, in_shared: false };
+const withdrawn = { ...listed, id: 'withdrawn', name: 'Withdrawn skill', listed: false };
+const base = payloads['/api/skills'];
+payloads['/api/skills'] = { ...base, skills: [listed] };
+payloads['/api/skills?include_unlisted=1'] = { ...base, skills: [listed, withdrawn] };
+await renderSkills();
+const page = document.getElementById('page');
+assert.ok(page.textContent.includes('Available skill'));
+assert.ok(!page.textContent.includes('Withdrawn skill'));
+const toggle = page.querySelector('label.toggle input');
+assert.ok(toggle);
+toggle.checked = true; await toggle.fire('change');
+assert.ok(page.textContent.includes('Withdrawn skill'));
+assert.ok(page.textContent.includes(uiText('api.unlisted')));
+assert.equal(page.querySelectorAll('.stat b')[0].textContent, '1');
+assert.equal(page.querySelectorAll('.stat b')[1].textContent, '0');
+assert.equal(page.querySelectorAll('.stat b')[2].textContent, '0');
+const again = page.querySelector('label.toggle input');
+again.checked = false; await again.fire('change');
+assert.ok(!page.textContent.includes('Withdrawn skill'));
+''',
     "首页点状态直接改": r'''
 await loadMe(); await renderProjects();
 assert.equal(document.getElementById('page').querySelector('button.state-pick'), null);

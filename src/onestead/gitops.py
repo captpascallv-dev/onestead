@@ -11,7 +11,7 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
-from .store import BaseError, StorageError
+from .store import Busy, StorageError
 
 LOCK_NAME = "company-base-write.lock"
 LOCK_WAIT_SECONDS = 30
@@ -43,7 +43,7 @@ def file_lock(lock: Path):
             except FileNotFoundError:
                 continue
             if time.monotonic() > deadline:
-                raise BaseError(tr("agent.257")) from None
+                raise Busy(tr("agent.257")) from None
             time.sleep(0.2)
     try:
         os.write(fd, str(os.getpid()).encode())

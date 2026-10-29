@@ -120,6 +120,8 @@ ChatGPT 地址中的域名换成你自己的。人用来登录网页的口令不
 onestead company --as codex
 ```
 
+程序可使用 JSON 接口，详见 [`onestead api` 接口文档](docs/api.md)。
+
 ## 给同事和远程 agent 用
 
 ### 对外开放工作区

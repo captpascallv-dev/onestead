@@ -27,7 +27,7 @@ from .skills import SkillMixin
 from .sites import SiteMixin
 from .todos import TodoMixin
 from .workspace import TokenMixin
-from .store import (LEVEL_NAMES, LEVELS, BaseError, Doc, StorageError, Store, Viewer, clean_project_paths,
+from .store import (LEVEL_NAMES, LEVELS, BaseError, Doc, Forbidden, NotFound, StorageError, Store, Viewer, clean_project_paths,
                     make_viewer, member_cards, member_keys, now_taipei, owner_name_at, project_path_list)
 from .textutil import (MAX_TEXT, SECRET_PATTERNS, _ago, _as_date, _cell, _check_signature,  # noqa: F401
                        _check_text, _dump_front, _strip_title, soften_headings)
@@ -81,7 +81,7 @@ class CompanyBase(TodoMixin, AppMixin, SkillMixin, ManageMixin, HomeMixin, Token
             docs = self.store.load()
         viewer = make_viewer(docs, self.agent_key, self.allow_owner, remote=self.require_remote)
         if self.require_remote and not viewer.can_remote:
-            raise BaseError(tr("agent.079", v0=self.owner_name))
+            raise Forbidden(tr("agent.079", v0=self.owner_name))
         return viewer, docs, viewer.visible(docs)
 
     def _today(self) -> dt.date:
@@ -450,10 +450,10 @@ class CompanyBase(TodoMixin, AppMixin, SkillMixin, ManageMixin, HomeMixin, Token
                 viewer.is_owner or viewer.member.meta.get("kind") == "human"):
             return viewer, docs, visible  # 人的 can_write 只管公司事实，不管自己的记事。
         if not viewer.can_write:
-            raise BaseError(self._identity_line(viewer) + tr("agent.099"))
+            raise Forbidden(self._identity_line(viewer) + tr("agent.099"))
         if viewer.assigned and operation not in (
                 "update_project_status", "update_project_summary", "record_decision", "personal"):
-            raise BaseError(tr("agent.100"))
+            raise Forbidden(tr("agent.100"))
         self._require_signer(viewer)
         return viewer, docs, visible
 
@@ -466,7 +466,7 @@ class CompanyBase(TodoMixin, AppMixin, SkillMixin, ManageMixin, HomeMixin, Token
         # 成员登记了 signers 的是几个助手共用的身份：谁写就得署谁的名，记录里才分得清。
         signers = viewer.member.meta.get("signers") if viewer.member else None
         if signers and getattr(self, "_signature", None) not in signers:
-            raise BaseError(tr("agent.101", v0='、'.join(map(str, signers)), v1=tr("agent.057").join(map(str, signers))))
+            raise Forbidden(tr("agent.101", v0='、'.join(map(str, signers)), v1=tr("agent.057").join(map(str, signers))))
 
     def _human_workspace(self):
         """本人确认和发收口令不允许 agent 代做，也不受公司写入开关影响。"""
@@ -479,13 +479,13 @@ class CompanyBase(TodoMixin, AppMixin, SkillMixin, ManageMixin, HomeMixin, Token
     def _granted_project(viewer: Viewer, project: Doc) -> None:
         """同事按授权写入只认授权给自己的项目。公开项目谁都能看，但看得到不等于能往里写。"""
         if viewer.assigned and project.id not in viewer.projects:
-            raise BaseError(tr("agent.103", v0=project.id))
+            raise Forbidden(tr("agent.103", v0=project.id))
 
     def _internal_only(self, what: str) -> tuple[Viewer, list[Doc], list[Doc]]:
         """只给自己人看的读接口（会暴露本机路径或 主人 个人事务的）。"""
         viewer, docs, visible = self._ctx()
         if not viewer.known or not viewer.valid or viewer.assigned or viewer.remote:
-            raise BaseError(tr("agent.104", v0=what))
+            raise Forbidden(tr("agent.104", v0=what))
         return viewer, docs, visible
 
     def _status_file(self, project: Doc, visible: list[Doc]) -> tuple[str, str]:
@@ -509,16 +509,22 @@ class CompanyBase(TodoMixin, AppMixin, SkillMixin, ManageMixin, HomeMixin, Token
                        body: str | None = None, sensitivity: str = "internal",
                        paths: list[str] | None = None, signed_as: str | None = None) -> str:
         """新建项目，只写 projects/<id>/project.md。主人和全读能写的伙伴（本机或远程）都能调。"""
+        commit = self._create_project_commit(project_id, title, goal, state, body, sensitivity, paths, signed_as)
+        return tr("agent.061", v0=str(project_id or "").strip(), v1=commit)
+
+    def _create_project_commit(self, project_id: str, title: str, goal: str, state: str = "构想中",
+                               body: str | None = None, sensitivity: str = "internal",
+                               paths: list[str] | None = None, signed_as: str | None = None) -> str:
         signed_as = self._sign(signed_as)
         with self._write():
             viewer, docs, _ = self._ctx()
             if not self._may_create_project(viewer):
-                raise BaseError(tr("agent.136", v0=self.owner_name))
+                raise Forbidden(tr("agent.136", v0=self.owner_name))
             self._require_signer(viewer)
             if sensitivity not in LEVELS:
                 raise BaseError(tr("agent.137"))
             if not viewer.is_owner and sensitivity == "public":
-                raise BaseError(tr("agent.138"))
+                raise Forbidden(tr("agent.138"))
             project_id = str(project_id or "").strip()
             if not ID_RE.match(project_id):
                 raise BaseError(tr("agent.139"))
@@ -549,23 +555,27 @@ class CompanyBase(TodoMixin, AppMixin, SkillMixin, ManageMixin, HomeMixin, Token
             tool = "网页界面" if viewer.is_owner else "create_project"
             commit = gitops.write_and_commit(self.root, {rel: content}, f"项目：新建「{title}」",
                                              tool, viewer.key, signed_as)
-        return tr("agent.061", v0=project_id, v1=commit)
+        return commit
 
     def update_project_status(self, project_id: str, text: str, signed_as: str | None = None) -> str:
+        rel, commit = self._append_status_commit(project_id, text, signed_as)
+        return tr("agent.062", v0=rel, v1=commit)
+
+    def _append_status_commit(self, project_id: str, text: str, signed_as: str | None = None) -> tuple[str, str]:
         signed_as = self._sign(signed_as)
         text = _check_text(tr("agent.076"), text)
         with self._write():
             viewer, _, visible = self._writer(operation="update_project_status")
             project = self._find(visible, "project", project_id)
             if not project:
-                raise BaseError(tr("agent.144", v0=project_id, v1=tr(NOT_FOUND)))
+                raise NotFound(tr("agent.144", v0=project_id, v1=tr(NOT_FOUND)))
             self._granted_project(viewer, project)
             rel, current = self._status_file(project, visible)
             content = current.rstrip("\n") + "\n\n" + self._entry(viewer.key, signed_as, text)
             first = text.split("\n", 1)[0][:40]
             commit = gitops.write_and_commit(self.root, {rel: content}, f"进展：{project.id} — {first}",
                                              "update_project_status", viewer.key, signed_as)
-        return tr("agent.062", v0=rel, v1=commit)
+        return rel, commit
 
     def update_project_summary(self, project_id: str, sections: dict, signed_as: str | None = None) -> str:
         """改现状、下一步、分工、入口。能记进展的身份就能改，判断和 update_project_status 同一套。"""

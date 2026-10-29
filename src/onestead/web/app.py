@@ -189,7 +189,8 @@ class Workspace(HomeApi, AdminApi, Guard, WorkspaceCore):
         fresh = request.query_params.get("fresh") == "1"
         payload = await projection_for(viewer).skill_list(
             visible, by_id, fresh, request.state.principal, run_in_threadpool,
-            lambda: self.as_actor(request).shared_skill_list)
+            lambda: self.as_actor(request).shared_skill_list,
+            include_unlisted=request.query_params.get("include_unlisted") == "1")
         return JSONResponse(payload)
 
     async def skill_detail(self, request: Request):

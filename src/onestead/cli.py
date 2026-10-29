@@ -103,6 +103,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = LocalizedParser(prog="onestead", description=tr("agent.170"), parents=[common])
     sub = p.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("api", parents=[common], help=tr("api.help"))
     s = sub.add_parser("init", parents=[common], help=tr("agent.171"))
     s.add_argument("data_dir", help=tr("agent.172"))
     s.add_argument("--owner", required=True, help=tr("agent.173"))
@@ -207,6 +208,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--json", required=True, help=tr("agent.219"))
 
     s = sub.add_parser("skills", parents=[common], help=tr("agent.220"))
+    s.add_argument("--all", action="store_true", help=tr("api.include_unlisted"))
     s.add_argument("--alerts", action="store_true", help=tr("agent.221"))
     s.add_argument("--fresh", action="store_true", help=tr("agent.222"))
     s = sub.add_parser("skill", parents=[common], help=tr("agent.223"))
@@ -234,6 +236,9 @@ def run(argv: list[str] | None = None) -> int:
     except BaseError as error:
         print(str(error), file=sys.stderr)
         return 2
+    if args.cmd == "api":
+        from .api import run
+        return run(args)
     if args.cmd == "init":
         from .scaffold import init_repo
         try:
@@ -297,7 +302,7 @@ def run(argv: list[str] | None = None) -> int:
                                                         args.note or "批量登记", signed)
                                      if args.file else base.register_app(_json(args.json or "", "--json"), signed)),
             "app-update": lambda: base.update_app(args.app_id, _json(args.json, "--json"), signed),
-            "skills": lambda: base.list_skills(args.alerts, args.fresh),
+            "skills": lambda: base.list_skills(args.alerts, args.fresh, args.all),
             "skill": lambda: base.get_skill(args.skill_id),
             "skill-register": lambda: (base.register_skills(_json(open(args.file, encoding="utf-8").read(), "--file"),
                                                             args.note or "批量登记", signed)

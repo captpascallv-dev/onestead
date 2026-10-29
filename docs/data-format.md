@@ -304,11 +304,14 @@ The id is the skill directory name: `^[A-Za-z0-9][A-Za-z0-9._-]{1,60}$`. Upper c
 | `home` | no | At most 300 characters. The directory treated as the canonical copy. |
 | `project` | no | A project id. |
 | `registered_by` | on register | Author string. |
+| `listed` | no | Boolean; omitted means `true`. Set only through `update_skill`, not registration. |
 | `updated`, `updated_by` | on write | Date and author string. |
 
 Register writes `sensitivity: internal`. The web app can set a skill to `public` or back to `internal`. That flag is what opens the shared package to assigned readers who do not have the skill in their `skills` list. The raw file is still hidden from assigned readers. See below.
 
 Notes in the body are at most 3,000 characters.
+
+`listed: false` keeps the note and installed files, but removes the skill from default lists, totals, alerts, shared lists, and downloads. Local full-access readers can request `include_unlisted` (`skills --all` in the CLI), and the owner can include unlisted skills in the web gallery. Those entries and local `get_skill` output are marked Unlisted. Assigned and remote readers never receive unlisted packages, even when asking to include them. `update_skill` with `listed: true` relists the skill. Existing notes do not need this field added.
 
 The built-in scan list covers common Claude, Codex, PI, Grok CLI and Cursor directories. Those paths sit under `ONESTEAD_SKILL_HOME`, or under the process home when that variable is unset.
 

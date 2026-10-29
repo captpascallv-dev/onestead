@@ -36,6 +36,18 @@ class BaseError(Exception):
     """可预期的失败，消息直接给调用的 agent 看。"""
 
 
+class NotFound(BaseError):
+    """内容不存在或当前身份看不见。"""
+
+
+class Forbidden(BaseError):
+    """身份或权限不允许这次操作。"""
+
+
+class Busy(BaseError):
+    """写锁等不到：别的写入还没结束，稍后重试。"""
+
+
 class AuthRejected(BaseError):
     """这次请求的会话或口令在落笔前已经失效。"""
 
@@ -459,7 +471,7 @@ def make_viewer(docs: list[Doc], key: str | None, allow_owner: bool = False, *, 
                       access_mode="full", workspace_owner=company_owner, acl=company_owner, remote=remote,
                       project_docs=projects)
     if key == company_owner:
-        raise BaseError(tr("agent.529", v0=company_owner))
+        raise Forbidden(tr("agent.529", v0=company_owner))
     member = members.get(key) if key else None
     if member is None:
         # 已登记但无效的身份不给任何内容；从未登记的仍可看公开。

@@ -1,7 +1,7 @@
 "use strict";
 // Skill 广场，以及首页的“Skill 提醒”。用 app.js、apps.js 里的小工具。
 
-const SK = { data: null, q: "", view: "all", open: new Set() };
+const SK = { data: null, q: "", view: "all", open: new Set(), showUnlisted: false };
 const SK_STATE = {
   same: ["skills.092", "ok"], behind: ["skills.091", "bad"], differs: ["skills.090", "warn"], broken: ["skills.017", "bad"], snapshot: ["skills.089", "faint"],
 };
@@ -69,7 +69,7 @@ function showSkill(r) {
       input.disabled = true;
       try {
         await api("/api/skills/share", { id: r.id, public: input.checked });
-        SK.data = await api("/api/skills");
+        SK.data = await api("/api/skills" + (SK.showUnlisted ? "?include_unlisted=1" : ""));
         drawSkills();
         showSkill(SK.data.skills.find(s => s.id === r.id));
         toast(uiText("skills.075"));
@@ -84,7 +84,8 @@ function showSkill(r) {
     h("div", { class: "meta-line" }, h("span", { class: "pill mono", text: r.id }),
       rec.origin ? h("span", { class: "pill", text: uiLabel(rec.origin) }) : null,
       r.version ? h("span", { class: "pill", text: uiText("skills.010", [r.version]) }) : null,
-      r.in_shared ? h("span", { class: "pill", text: uiText("skills.074") }) : null),
+      r.in_shared ? h("span", { class: "pill", text: uiText("skills.074") }) : null,
+      r.listed === false ? h("span", { class: "pill red", text: uiText("api.unlisted") }) : null),
     h("p", { class: "app-line", text: rec.one_line || r.description || uiText("skills.073") }),
     rec.one_line && r.description ? h("p", { class: "note faint", text: r.description }) : null,
     h("div", { class: "block-title", text: uiText("skills.072") }),
@@ -156,7 +157,9 @@ function familyCell(rows, key) {
 
 function skillRow(r, nested) {
   const tr = h("tr", { class: "click" + (nested ? " nested" : ""), onclick: () => showSkill(r) },
-    h("td", {}, h("div", { class: "cell-name" }, r.name, r.alert ? h("span", { class: "sk-flag", text: r.alert === "behind" ? uiText("skills.031") : uiText("skills.017") }) : null),
+    h("td", {}, h("div", { class: "cell-name" }, r.name,
+      r.listed === false ? h("span", { class: "pill red", text: uiText("api.unlisted") }) : null,
+      r.alert ? h("span", { class: "sk-flag", text: r.alert === "behind" ? uiText("skills.031") : uiText("skills.017") }) : null),
       h("div", { class: "cell-sub" + (r.alert ? " red-text" : ""), text: r.alert ? skWhy(r).join("；") : (r.record?.one_line || r.description || r.id) })),
     SK.data.harnesses.map(x => h("td", { class: "sk-col hide-sm" }, skState(r.installs[x.key]))),
     h("td", { class: "show-sm" }, h("span", { class: "cell-sub", text: uiText("skills.044", [Object.keys(r.installs).length]) })));
@@ -179,7 +182,7 @@ function familyRows(f) {
 let skTable = null;
 let skCount = null;
 onWorkspaceReset(() => {
-  Object.assign(SK, { data: null, q: "", view: "all", open: new Set() });
+  Object.assign(SK, { data: null, q: "", view: "all", open: new Set(), showUnlisted: false });
   skTable = skCount = null;
 });
 
@@ -211,7 +214,10 @@ function pluginCard() {
 
 async function renderSkills(fresh) {
   const page = document.getElementById("page");
-  try { SK.data = await api("/api/skills" + (fresh && capability("manage_skill_share") ? "?fresh=1" : "")); } catch (e) {
+  const query = new URLSearchParams();
+  if (fresh && capability("manage_skill_share")) query.set("fresh", "1");
+  if (SK.showUnlisted && capability("manage_skill_share")) query.set("include_unlisted", "1");
+  try { SK.data = await api("/api/skills" + (query.size ? "?" + query : "")); } catch (e) {
     if (e.message !== "401") put(page, h("p", { class: "muted", text: e.message }));
     return;
   }
@@ -236,12 +242,14 @@ async function renderSkills(fresh) {
         h("p", { class: "lead", text: uiText("skills.030") })),
       h("button", { class: "btn", type: "button", onclick: async () => { toast(uiText("skills.029")); await renderSkills(true); toast(uiText("skills.028")); } }, uiText("skills.027"))),
     h("div", { class: "stat-row" },
-      h("div", { class: "card stat" }, h("b", { text: all.length }), h("span", { text: uiText("skills.026") })),
+      h("div", { class: "card stat" }, h("b", { text: all.filter(r => r.listed !== false).length }), h("span", { text: uiText("skills.026") })),
       h("button", { class: "card stat" + (behind ? " warn" : ""), type: "button", onclick: () => { SK.view = "behind"; drawSeg(); drawSkills(); } },
         h("b", { text: behind }), h("span", { text: uiText("skills.025") })),
       h("button", { class: "card stat" + (broken ? " warn" : ""), type: "button", onclick: () => { SK.view = "broken"; drawSeg(); drawSkills(); } },
         h("b", { text: broken }), h("span", { text: uiText("skills.024") }))),
-    h("div", { class: "card filters" }, q, seg),
+    h("div", { class: "card filters" }, q, seg,
+      h("label", { class: "toggle" }, h("input", { type: "checkbox", checked: SK.showUnlisted || null,
+        onchange: async e => { SK.showUnlisted = e.target.checked; await renderSkills(); } }), uiText("api.include_unlisted"))),
     skCount,
     h("div", { class: "card table-wrap" }, skTable),
     h("p", { class: "note faint foot-note", text: uiText("skills.023", []) +
